@@ -1,0 +1,20 @@
+.env
+.env.*
+
+# BACKEND (Python / Django)
+
+venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Local database file
+db.sqlite3
+
+# FRONTEND (Node / React)
+
+node_modules/
+
+# Vite build output folder (will be created later)
+dist/
