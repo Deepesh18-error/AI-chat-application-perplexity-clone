@@ -2,43 +2,57 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+# Import our new services module and the custom exception
+from . import services
+from .services import GeminiError
+
+
 @api_view(["POST"])
 def generate_view(request):
     """
-    API endpoint to receive a user prompt.
+    API endpoint that receives a user prompt and returns a list of
+    generated search queries.
 
-    This view is designed to be the primary entry point for the query
-    processing pipeline. In Stage 1, its only responsibility is to
-    confirm that it has received the prompt from the frontend.
-
-    Args:
-        request: The Django HttpRequest object. The user's prompt is
-                 expected in the request body as JSON: {"prompt": "..."}.
-
-    Returns:
-        Response: A DRF Response object.
-                  - 200 OK: If the prompt is received successfully.
-                  - 400 Bad Request: If the 'prompt' key is missing or empty.
+    This view acts as an orchestrator:
+    1. Validates the incoming prompt.
+    2. Delegates the query generation task to the services layer.
+    3. Handles potential errors from the service.
+    4. Formats and returns the final response to the client.
     """
     try:
         prompt = request.data.get("prompt")
 
         if not prompt or not isinstance(prompt, str):
-            # If the prompt is missing or not a string, return an error
             return Response(
                 {"error": "A valid 'prompt' string is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        print(f"✅ [API] Received prompt: '{prompt}'")
+        # --- THE DELEGATION STEP ---
+        # Call our new specialist function from the services module.
+        print(f"✅ [VIEW] Delegating prompt to services layer: '{prompt}'")
+        queries = services.generate_search_queries(prompt)
+        # ---------------------------
 
-        response_data = {"message": f"Prompt received successfully."}
+        # The new API "contract": return the list of queries.
+        response_data = {"queries": queries}
 
+        print(f"✅ [VIEW] Successfully received queries. Sending response to client.")
         return Response(response_data, status=status.HTTP_200_OK)
 
+    except GeminiError as e:
+        # --- CATCHING OUR CUSTOM ERROR ---
+        # If the service layer raised a specific error,
+        # we catch it here and return a user-friendly server error.
+        print(f"🚨 [VIEW] A GeminiError occurred: {e}")
+        return Response(
+            {"error": f"An error occurred with the AI service: {e}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
     except Exception as e:
-        # Generic error handler 
-        print(f"🚨 [API] An unexpected error occurred: {e}")
+        # Catch any other unexpected errors that might occur in the view.
+        print(f"🚨 [VIEW] An unexpected error occurred: {e}")
         return Response(
             {"error": "An internal server error occurred."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
