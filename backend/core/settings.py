@@ -145,3 +145,8 @@ if not GOOGLE_API_KEY:
     # This will cause the server to crash on startup if the key is not found,
     # which is good because it prevents the application from running 
     raise ValueError("No GOOGLE_API_KEY found in environment variables.")
+
+
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+if not TAVILY_API_KEY:
+    raise ValueError("No TAVILY_API_KEY found in environment variables.")
