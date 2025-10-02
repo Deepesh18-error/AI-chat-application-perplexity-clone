@@ -8,6 +8,8 @@ import asyncio
 from tavily import AsyncTavilyClient
 from typing import Dict, Any
 
+#stage 4
+from crawl4ai import AsyncWebCrawler
 
 # Read the API key directly from the environment variable.
 # This is the most direct and reliable way.
@@ -171,3 +173,73 @@ async def get_urls_from_queries(queries: List[str]) -> List[str]:
     
     print(f"✅ [SERVICES] Returning {len(unique_urls)} unique URLs.")
     return unique_urls
+
+# stage 4
+async def _scrape_one_url(crawler: AsyncWebCrawler, url: str) -> Dict[str, str]:
+    """
+    An asynchronous helper function to perform a single scrape using the real Crawl4AI library.
+    This function is designed to be resilient.
+
+    Args:
+        crawler: An active instance of AsyncWebCrawler.
+        url: The URL to scrape.
+
+    Returns:
+        A dictionary containing the source URL and the scraped markdown content.
+        Returns an empty content string if scraping fails.
+    """
+    print(f"  > Starting scrape for: {url}")
+    try:
+        # The arun method is called with only the URL.
+        # The library uses its own internal default timeouts.
+        result = await crawler.arun(url=url)
+        
+        # Check if the crawler returned valid content
+        if result and result.markdown:
+            content_length = len(result.markdown)
+            print(f"  < Finished scrape for: {url} ({content_length} chars)")
+            return {"source": url, "content": result.markdown}
+        else:
+            print(f"  ? No content found for: {url}")
+            return {"source": url, "content": ""}
+            
+    except Exception as e:
+        # This will catch any errors from the crawl4ai library itself.
+        print(f"  🚨 Error scraping '{url}': {e}")
+        return {"source": url, "content": ""}
+
+async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
+    """
+    Takes a list of URLs and scrapes them all in parallel using Crawl4AI.
+    It then filters out failed or empty scrapes.
+
+    Args:
+        urls: A list of URL strings to scrape.
+
+    Returns:
+        A list of dictionaries, each containing the 'source' URL and its
+        'content' in Markdown format.
+    """
+    print(f"✅ [SERVICES] Starting parallel scrape for {len(urls)} URLs...")
+
+    scraped_data = []
+    # Use a single crawler instance for all jobs for efficiency.
+    # The 'async with' block ensures the browser resources are cleaned up properly.
+    async with AsyncWebCrawler() as crawler:
+        #  1. Prepare the Tasks 
+        tasks = [_scrape_one_url(crawler, url) for url in urls]
+
+        #  2. Execute Concurrently 
+        # asyncio.gather runs all scraping jobs at the same time.
+        results = await asyncio.gather(*tasks)
+
+        #  3. Process and Filter Results 
+        for result in results:
+            # Check if the content is not empty or just whitespace.
+            if result and result.get("content", "").strip():
+                scraped_data.append(result)
+            else:
+                print(f"  - Discarding empty result for: {result.get('source')}")
+
+    print(f"✅ [SERVICES] Finished scraping. Successfully extracted content from {len(scraped_data)} out of {len(urls)} URLs.")
+    return scraped_data
