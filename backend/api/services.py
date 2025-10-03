@@ -11,6 +11,10 @@ from typing import Dict, Any
 #stage 4
 from crawl4ai import AsyncWebCrawler
 
+#stage 5
+from typing import Dict, Any, AsyncGenerator, List 
+from asgiref.sync import sync_to_async
+
 # Read the API key directly from the environment variable.
 # This is the most direct and reliable way.
 try:
@@ -30,6 +34,66 @@ class GeminiError(Exception):
     pass
 
 
+# stage 5 functions
+
+def decide_query_path(prompt: str) -> str:
+    """
+    Uses a fast LLM to decide if a prompt requires a web search or can be answered directly.
+
+    This is a synchronous function designed for a quick, blocking decision.
+
+    Args:
+        prompt: The user's input prompt.
+
+    Returns:
+        A string: 'search_required' or 'direct_answer'. Defaults to 'search_required' on failure.
+    """
+    print(f"✅ [SERVICES] STAGE 5.1: Deciding query path for: '{prompt}'")
+    try:
+        # 1. Select the fast model and configure for JSON output
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            generation_config={"response_mime_type": "application/json"}
+        )
+
+        # 2. Craft the classification system prompt
+        system_prompt = """
+        You are an expert query classifier. Your task is to determine if a user's prompt requires a real-time web search to answer accurately or if it can be answered directly by a large language model.
+
+        Categorize the prompt into one of two paths:
+        1.  `search_required`: For questions about recent events, specific facts, products, people, companies, or any topic that requires up-to-date, external information.
+        2.  `direct_answer`: For self-contained questions like math problems, logic puzzles, creative writing requests, coding tasks, summarization of provided text, or general knowledge questions where real-time data is not essential.
+
+        You must respond with ONLY a valid JSON object with a single key "path" and one of the two string values.
+        Example: {"path": "search_required"}
+        """
+        
+        # 3. Make the API call
+        response = model.generate_content([system_prompt, "user: ", prompt])
+        
+        # 4. Parse and validate the response
+        decision = json.loads(response.text)
+        path = decision.get("path")
+        
+        if path not in ["search_required", "direct_answer"]:
+            # Handle cases where the LLM returns an invalid value
+            print(f"🚨 [SERVICES] Invalid path value received: '{path}'. Defaulting to search.")
+            return "search_required"
+            
+        print(f"✅ [SERVICES] Path decided: '{path}'")
+        return path
+
+    except Exception as e:
+        # 5. Fail-safe: If anything goes wrong, default to the more robust search path
+        print(f"🚨 [SERVICES] An error occurred in decide_query_path: {e}. Defaulting to 'search_required'.")
+        return "search_required"
+    
+
+decide_query_path_async = sync_to_async(decide_query_path, thread_sensitive=True)
+    
+
+
+# stage 2
 def generate_search_queries(prompt: str) -> List[str]:
     """
     Takes a user's natural language prompt and uses the Gemini API
@@ -135,44 +199,26 @@ async def _search_tavily_async(query: str) -> List[Dict[str, Any]]:
 
 async def get_urls_from_queries(queries: List[str]) -> List[str]:
     """
-    Takes a list of search queries and fetches the search results for all of
-    them concurrently using the Tavily Search API.
-
-    Args:
-        queries: A list of search query strings.
-
-    Returns:
-        A de-duplicated list of URLs relevant to the search queries.
+    Takes a list of search queries, fetches results concurrently, and returns
+    a de-duplicated and LIMITED list of URLs.
     """
     print(f"✅ [SERVICES] Starting concurrent search for {len(queries)} queries...")
-    
-    # 1. Prepare the Tasks
-    # Create a list of "tasks" (coroutines) to run. Each task is a call
-    # to our helper function with a different query.
     tasks = [_search_tavily_async(query) for query in queries]
-
-    #  2. Execute Concurrently 
-    # asyncio.gather() runs all the tasks in the list at the same time.
-    # It waits until the last one is finished.
-    # all_results will be a list of lists of dictionaries.
     all_results = await asyncio.gather(*tasks)
-
-    #  3. Consolidate and Sanitize 
-    # Flatten the list of lists into a single list of result dictionaries.
     flat_results = [item for sublist in all_results for item in sublist]
-
-    # Extract just the URLs from the results.
     urls = [result["url"] for result in flat_results if "url" in result]
-
     print(f"✅ [SERVICES] Found {len(urls)} total URLs (before de-duplication).")
     
-    # De-duplicate the list of URLs while preserving order
-    # Using a set is faster for very large lists, but dict.fromkeys is a common
-    # and readable way to preserve order.
     unique_urls = list(dict.fromkeys(urls))
-    
-    print(f"✅ [SERVICES] Returning {len(unique_urls)} unique URLs.")
-    return unique_urls
+    print(f"✅ [SERVICES] Found {len(unique_urls)} unique URLs.")
+
+    # --- THIS IS THE NEW OPTIMIZATION ---
+    MAX_URLS_TO_SCRAPE = 7
+    limited_urls = unique_urls[:MAX_URLS_TO_SCRAPE]
+    print(f"✅ [SERVICES] Limiting to {len(limited_urls)} URLs for scraping.")
+    # ------------------------------------
+
+    return limited_urls
 
 # stage 4
 async def _scrape_one_url(crawler: AsyncWebCrawler, url: str) -> Dict[str, str]:
@@ -207,6 +253,7 @@ async def _scrape_one_url(crawler: AsyncWebCrawler, url: str) -> Dict[str, str]:
         # This will catch any errors from the crawl4ai library itself.
         print(f"  🚨 Error scraping '{url}': {e}")
         return {"source": url, "content": ""}
+
 
 async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
     """
@@ -243,3 +290,131 @@ async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
 
     print(f"✅ [SERVICES] Finished scraping. Successfully extracted content from {len(scraped_data)} out of {len(urls)} URLs.")
     return scraped_data
+
+#stage 5
+
+async def _synthesize_answer_from_context(
+    prompt: str, scraped_data: List[Dict[str, str]]
+) -> AsyncGenerator[str, None]:
+    """
+    (Helper for the Orchestrator)
+    The final RAG synthesis step. Takes the scraped context and generates the
+    final cited answer, streaming the tokens.
+    """
+    # 1. Format the context for the LLM
+    formatted_context = ""
+    for i, item in enumerate(scraped_data, 1):
+        formatted_context += f"[Source {i}: {item['source']}]\n{item['content']}\n\n"
+
+    # 2. Craft the "Mega-Prompt"
+    system_prompt = """
+    You are a world-class AI research assistant. Your purpose is to answer the user's question with a comprehensive, well-structured, and factual response.
+
+    Follow these instructions precisely:
+    1.  **Analyze the User's Question:** Understand the core intent of the user's prompt.
+    2.  **Synthesize from Sources:** Base your answer **exclusively** on the information provided in the numbered sources. Do not use any outside knowledge.
+    3.  **Cite Everything:** You MUST cite every piece of information. Add a citation marker, like [1], [2], etc., at the end of each sentence or claim that is supported by a source. The number must correspond to the source number provided. You can use multiple citations for a single sentence, like [1][2].
+    4.  **Format Beautifully:** Structure your answer using Markdown for clarity. Use headers, bullet points, and bold text to create a readable and organized response.
+    5.  **Handle Insufficient Information:** If the provided sources do not contain enough information to answer the question, you must explicitly state: "I could not find enough information in the provided sources to answer this question." Do not try to make up an answer.
+    """
+    full_prompt = [
+        system_prompt,
+        "--- CONTEXT: SOURCES ---",
+        formatted_context,
+        "--- USER QUESTION ---",
+        f"user: {prompt}",
+    ]
+
+    # 3. Select a powerful model for synthesis
+    model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+
+    # 4. Initiate the streaming call and yield tokens
+    response_stream = model.generate_content(full_prompt, stream=True)
+    for chunk in response_stream:
+        if chunk.text:
+            yield chunk.text
+
+
+async def generate_and_stream_answer(
+    prompt: str, path: str
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    The main orchestrator. Handles both Search/RAG and Direct Answer paths,
+    yielding structured event dictionaries for the frontend.
+    """
+    try:
+        # --- PATH 1: Direct Answer ---
+        if path == "direct_answer":
+            print("✅ [ORCHESTRATOR] Executing Direct Answer path.")
+            yield {"event": "steps", "data": {"message": "Generating answer..."}}
+
+            model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+            response_stream = model.generate_content(prompt, stream=True)
+            for chunk in response_stream:
+                if chunk.text:
+                    yield {"event": "token", "data": {"token": chunk.text}}
+        
+        # --- PATH 2: Full RAG Pipeline ---
+        else: # path == "search_required"
+            print("✅ [ORCHESTRATOR] Executing Search/RAG path.")
+            
+            # Step 1: Generate Search Queries
+            yield {"event": "steps", "data": {"message": "Generating search queries..."}}
+            queries = generate_search_queries(prompt)
+            yield {"event": "search_queries", "data": {"queries": queries}}
+            
+            # Step 2: Get URLs (now limited)
+            yield {"event": "steps", "data": {"message": "Searching the web..."}}
+            urls = await get_urls_from_queries(queries)
+            
+            # Step 3: Scrape Content
+            yield {"event": "steps", "data": {"message": f"Reviewing {len(urls)} sources..."}}
+            scraped_data = await scrape_urls_in_parallel(urls)
+
+            # Step 4: Edge Case Handling
+            MIN_SOURCES_REQUIRED = 3
+            if not scraped_data or len(scraped_data) < MIN_SOURCES_REQUIRED:
+                print(f"🚨 [ORCHESTRATOR] Scraped too few sources ({len(scraped_data)}). Aborting.")
+                yield {
+                    "event": "error",
+                    "data": {"message": f"I could not retrieve enough information from the web to provide a reliable answer. Only found {len(scraped_data)} sources."}
+                }
+                # The 'return' statement ends the generator function here.
+                return
+
+            # Step 5: Yield Source Information for the UI
+            sources = [{"title": url.split('/')[2].replace('www.', ''), "url": url} for url in urls]
+            yield {"event": "sources", "data": {"sources": sources}}
+
+            # Step 6: Synthesize and stream the final answer
+            yield {"event": "steps", "data": {"message": "Synthesizing the final answer..."}}
+            
+            async for token in _synthesize_answer_from_context(prompt, scraped_data):
+                yield {"event": "token", "data": {"token": token}}
+
+    except Exception as e:
+        print(f"🚨 [ORCHESTRATOR] A critical error occurred: {e}")
+        yield {
+            "event": "error",
+            "data": {"message": f"An unexpected error occurred during processing: {e}"}
+        }
+    
+    finally:
+        # Signal the end of the stream for all paths
+        print("✅ [ORCHESTRATOR] Stream finished.")
+        yield {"event": "finished", "data": {"message": "Stream completed."}}
+
+
+async def stream_sse_formatter(
+    event_generator: AsyncGenerator[Dict[str, Any], None]
+) -> AsyncGenerator[str, None]:
+    """
+    Wraps an async generator that yields dictionaries and formats them
+    into Server-Sent Event (SSE) strings for the client.
+    """
+
+    async for event in event_generator:
+        event_name = event["event"]
+        data = json.dumps(event["data"])
+        # Format as an SSE message: event: <name>\ndata: <json>\n\n
+        yield f"event: {event_name}\ndata: {data}\n\n"

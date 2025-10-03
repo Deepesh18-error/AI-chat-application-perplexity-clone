@@ -1,67 +1,54 @@
-import asyncio
-from rest_framework import status
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
+from django.http import StreamingHttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+import json
 
+# --- Our Application Imports ---
 from . import services
-from .services import GeminiError
 
-
-@api_view(["POST"])
-def generate_view(request):
+@csrf_exempt  # Disable CSRF for our API. In production, you'd use a more secure method like token authentication.
+@require_http_methods(["POST"]) # Enforce that this view only accepts POST requests.
+async def generate_view(request):
     """
-    API endpoint that orchestrates the entire data gathering pipeline:
-    Prompt -> Queries -> URLs -> Scraped Content.
-
-    Pipeline:
-    1. (Input) Receives and validates the user's prompt.
-    2. (Stage 2) Generates search queries using an LLM.
-    3. (Stage 3) Fetches relevant URLs concurrently.
-    4. (Stage 4) Scrapes the content from those URLs in parallel.
-    5. (Output) For testing, returns the final structured, scraped data.
+    The main API endpoint. It uses an intelligent router to decide the processing
+    path and then streams structured Server-Sent Events (SSE) back to the client.
+    
+    This is a native Django async view and does NOT use the DRF @api_view decorator.
     """
     try:
-        prompt = request.data.get("prompt")
-        if not prompt or not isinstance(prompt, str):
-            return Response(
-                {"error": "A valid 'prompt' string is required."},
-                status=status.HTTP_400_BAD_REQUEST,
+        # 1. Manually parse the request body because we are not using DRF's `request.data`
+        try:
+            body = json.loads(request.body)
+            prompt = body.get("prompt")
+        except json.JSONDecodeError:
+            # Use native Django JsonResponse for errors
+            return JsonResponse(
+                {"error": "Invalid JSON in request body."},
+                status=400
             )
 
-        #  STAGE 2: QUERY GENERATION 
-        print(f"✅ [VIEW] STAGE 2: Generating search queries for: '{prompt}'")
-        queries = services.generate_search_queries(prompt)
-        print(f"✅ [VIEW] STAGE 2: Generated {len(queries)} queries: {queries}")
+        if not prompt or not isinstance(prompt, str):
+            return JsonResponse(
+                {"error": "A valid 'prompt' string is required."},
+                status=400
+            )
 
-        #  STAGE 3: CONCURRENT URL RETRIEVAL 
-        print(f"✅ [VIEW] STAGE 3: Fetching URLs for {len(queries)} queries...")
-        urls = asyncio.run(services.get_urls_from_queries(queries))
-        print(f"✅ [VIEW] STAGE 3: Retrieved {len(urls)} unique URLs.")
+        # 2. Decide the path (synchronous call)
+        path = await services.decide_query_path_async(prompt)
+
+        # 3. Get the main orchestrator/generator based on the path
+        event_generator = services.generate_and_stream_answer(prompt, path)
+
+        # 4. Wrap the generator in our SSE formatter
+        sse_stream = services.stream_sse_formatter(event_generator)
         
-        #  STAGE 4: PARALLEL CONTENT SCRAPING 
-        print(f"✅ [VIEW] STAGE 4: Scraping content for {len(urls)} URLs...")
-        scraped_data = asyncio.run(services.scrape_urls_in_parallel(urls))
-        print(f"✅ [VIEW] STAGE 4: Successfully scraped {len(scraped_data)} pages.")
-
-
-        #  FINAL RESPONSE (FOR STAGE 4 TESTING) 
-        # The API now returns the fully processed, structured data.
-        response_data = {"scraped_data": scraped_data}
-
-        return Response(response_data, status=status.HTTP_200_OK)
-
-    except GeminiError as e:
-        # Handle errors specifically from the query generation stage
-        print(f"🚨 [VIEW] A GeminiError occurred: {e}")
-        return Response(
-            {"error": f"An error occurred with the AI service: {e}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        # 5. Return the native Django StreamingHttpResponse
+        return StreamingHttpResponse(sse_stream, content_type="text/event-stream")
 
     except Exception as e:
-        # Catch any other unexpected errors from any stage
-        print(f"🚨 [VIEW] An unexpected error occurred in the pipeline: {e}")
-        return Response(
+        # This is a fallback for any unexpected errors during the setup phase
+        print(f"🚨 [VIEW] A top-level error occurred in generate_view: {e}")
+        return JsonResponse(
             {"error": f"An internal server error occurred: {e}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status=500
         )
