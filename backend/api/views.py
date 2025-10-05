@@ -34,7 +34,7 @@ async def generate_view(request):
             )
 
         # 2. Decide the path (synchronous call)
-        path = await services.decide_query_path_async(prompt)
+        path = await services.get_intelligent_path(prompt)
 
         # 3. Get the main orchestrator/generator based on the path
         event_generator = services.generate_and_stream_answer(prompt, path)

@@ -15,6 +15,14 @@ from crawl4ai import AsyncWebCrawler
 from typing import Dict, Any, AsyncGenerator, List 
 from asgiref.sync import sync_to_async
 
+# New Intelligent Classification Pipeline
+import re
+from datetime import datetime
+
+# NLP function 
+import spacy
+from typing import Dict, Any
+
 # Read the API key directly from the environment variable.
 # This is the most direct and reliable way.
 try:
@@ -33,64 +41,377 @@ class GeminiError(Exception):
     """Custom exception for errors related to the Gemini API."""
     pass
 
+# Contextual metadata extraction 
 
-# stage 5 functions
-
-def decide_query_path(prompt: str) -> str:
+def extract_contextual_metadata(prompt: str) -> Dict[str, bool]:
     """
-    Uses a fast LLM to decide if a prompt requires a web search or can be answered directly.
-
-    This is a synchronous function designed for a quick, blocking decision.
-
-    Args:
-        prompt: The user's input prompt.
-
-    Returns:
-        A string: 'search_required' or 'direct_answer'. Defaults to 'search_required' on failure.
+    Performs a rapid, computationally cheap analysis of the query's form
+    to extract key contextual metadata before deeper processing.
     """
-    print(f"✅ [SERVICES] STAGE 5.1: Deciding query path for: '{prompt}'")
+    print("✅ [CLASSIFIER STAGE 1] Extracting contextual metadata...")
+    
+    prompt_lower = prompt.lower()
+    
+    # 1. Content Analysis
+    demonstrative_markers = [
+        "this code", "my code", "this text", "my text", "this document", 
+        "my document", "the following", "above code", "below code",
+        "this error", "my error", "this function", "my function",
+        "this script", "my script", "attached file", "my essay",
+        "this paragraph", "my paragraph", "these lines", "this snippet"
+    ]
+    
+    has_attached_content = (
+        any(marker in prompt_lower for marker in demonstrative_markers) or
+        bool(re.search(r'```[\s\S]*```', prompt)) or  # Convert to bool
+        bool(re.search(r'\{[\s\S]{20,}\}', prompt)) or
+        bool(re.search(r'\bthis\s+(code|text|error|function|bug|issue|problem)\b', prompt_lower)) or
+        bool(re.search(r'\bmy\s+(code|text|error|function|project|assignment)\b', prompt_lower))
+    )
+    
+    # 2. Temporal Analysis
+    temporal_keywords = [
+        "latest", "current", "today", "recent", "now", "breaking",
+        "just announced", "this week", "this month", "this year",
+        "update", "news", "right now", "at the moment", "presently"
+    ]
+    
+    current_year = str(datetime.now().year)
+    previous_year = str(datetime.now().year - 1)
+    
+    is_temporal = (
+        any(keyword in prompt_lower for keyword in temporal_keywords) or
+        current_year in prompt or
+        previous_year in prompt or
+        bool(re.search(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{4}\b', prompt_lower)) or
+        bool(re.search(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', prompt))
+    )
+    
+    # 3. Volatile Domain Detection
+    volatile_domains = [
+        "news", "stock", "stocks", "market", "weather", "election",
+        "breaking", "score", "game", "match", "price", "cryptocurrency",
+        "crypto", "bitcoin", "trending", "viral", "poll"
+    ]
+    
+    is_volatile_domain = any(domain in prompt_lower for domain in volatile_domains)
+    
+    # 4. Generation Intent Detection
+    generation_verbs = [
+        "create", "write", "generate", "make", "build", "compose",
+        "draft", "design", "develop", "code", "implement", "construct",
+        "craft", "produce"
+    ]
+    
+    creative_content_types = [
+        "story", "poem", "song", "lyrics", "essay", "email", "letter",
+        "script", "joke", "recipe", "paragraph", "article", "blog"
+    ]
+    
+    computational_indicators = [
+        "solve", "calculate", "compute", "find the value", "evaluate",
+        "simplify", "factor", "integrate", "differentiate"
+    ]
+    
+    is_generation_task = (
+        any(verb in prompt_lower for verb in generation_verbs) and
+        any(content in prompt_lower for content in creative_content_types)
+    ) or any(indicator in prompt_lower for indicator in computational_indicators)
+    
+    # 5. Factual Lookup Patterns
+    factual_patterns = [
+        "who is", "who are", "what is", "what are", "where is", "when did",
+        "when was", "how does", "how did", "why does", "why did",
+        "explain", "describe", "tell me about", "what happened",
+        "give me information", "information about"
+    ]
+    
+    is_factual_lookup = any(pattern in prompt_lower for pattern in factual_patterns)
+    
+    # 6. Entity Indicators
+    entity_indicators = [
+        " ceo ", " founder ", " president ", " company ", " organization ",
+        " university ", " country ", " city ", " person ", " celebrity ",
+        " scientist ", " author ", " politician "
+    ]
+    
+    likely_has_entities = any(indicator in f" {prompt_lower} " for indicator in entity_indicators)
+    
+    metadata = {
+        'has_attached_content': has_attached_content,
+        'is_temporal': is_temporal,
+        'is_volatile_domain': is_volatile_domain,
+        'is_generation_task': is_generation_task,
+        'is_factual_lookup': is_factual_lookup,
+        'likely_has_entities': likely_has_entities
+    }
+    
+    print(f"  > Metadata extracted: {metadata}")
+    return metadata
+
+# NLP implementation 
+
+
+# Load the spaCy model once when the module is loaded for efficiency
+try:
+    nlp = spacy.load("en_core_web_sm")
+    print("✅ [CLASSIFIER STAGE 2] spaCy model 'en_core_web_sm' loaded successfully.")
+except OSError:
+    print("🚨 [CLASSIFIER STAGE 2] spaCy model not found. Please run 'python -m spacy download en_core_web_sm'")
+    nlp = None
+
+# Define the programmatic mapping from LLM classifications to numerical scores
+SCORE_MAPPING = {
+    'intent_type': {
+        'factual_explanation': 0.9,
+        'general_qa': 0.7,
+        'comparison': 0.75,
+        'analytical_reasoning': 0.4,
+        'code_generation': 0.2,
+        'creative_generation': 0.1,
+        'math_computation': 0.15,
+        'content_summarization': 0.3
+    },
+    'entity_type': {
+        'specific_person_or_event': 0.9, # dynamism
+        'organization_or_product': 0.8, # dynamism
+        'broad_concept': 0.2, # dynamism
+        'user_provided_content': 0.1, # dynamism
+        'abstract_idea': 0.1, # dynamism
+    },
+    'information_scope': {
+        'comprehensive_overview': 0.9, # comprehensiveness
+        'specific_answer': 0.2, # comprehensiveness
+        'step_by_step_guide': 0.7 # comprehensiveness
+    },
+    'verification_level': {
+        'high_verification': 0.9, # verification
+        'medium_verification': 0.5, # verification
+        'low_verification': 0.1, # verification
+    }
+}
+
+def _get_linguistic_features(prompt: str) -> Dict[str, Any]:
+    """Helper to perform deterministic NLP processing using spaCy."""
+    if not nlp:
+        return {}
+    
+    doc = nlp(prompt)
+    
+    entities = [{'text': ent.text, 'label': ent.label_} for ent in doc.ents]
+    
+    # Simple verb extraction (find the root verb of the main clause)
+    root_verb = "unknown"
+    for token in doc:
+        if token.dep_ == "ROOT" and token.pos_ == "VERB":
+            root_verb = token.lemma_
+            break
+            
+    return {
+        "entities": entities,
+        "root_verb": root_verb,
+        "is_question": prompt.strip().endswith('?')
+    }
+
+def _get_llm_classifications(prompt: str, linguistic_features: Dict[str, Any], context_metadata: Dict[str, Any]) -> Dict[str, str]:
+    """Helper to get semantic classifications from the LLM using a structured prompt."""
+    
+    # This simulates a POML-style prompt by creating a highly structured text prompt.
+    # A true POML implementation would require a specific library if available.
+    system_prompt = f"""
+### ROLE ###
+You are a highly-tuned NLP classification model. Your purpose is to act as the semantic reasoning core of a sophisticated query processing pipeline. You will receive a user's query along with pre-processed metadata and linguistic features. Your sole task is to analyze all this information and classify the query's core attributes by selecting the most appropriate label for each of the four dimensions.
+
+### INPUTS ###
+You will be given three pieces of information to guide your decision:
+
+1.  **Contextual Metadata (from fast, rule-based checks):**
+    ```json
+    {json.dumps(context_metadata, indent=4)}
+    ```
+
+2.  **Linguistic Features (from spaCy NLP analysis):**
+    ```json
+    {json.dumps(linguistic_features, indent=4)}
+    ```
+
+3.  **Raw User Query:**
+    `{prompt}`
+
+### REASONING FRAMEWORK ###
+Before you provide the final JSON output, you must follow this internal reasoning process. This is your "thought process" to arrive at the correct classifications:
+
+1.  **Analyze Context First:** The `Contextual Metadata` provides powerful, high-priority signals.
+    *   If `has_attached_content` is `true`, the `Entity Type` is almost certainly `user_provided_content`, and the `Verification Level` is `low_verification`.
+    *   If `is_temporal` is `true`, the `Verification Level` should be `high_verification`, and the `Entity Type` is likely `specific_person_or_event` or `organization_or_product`.
+    *   If `is_generation_task` is `true`, the `Intent Type` is likely `creative_generation` or `code_generation`, and `Verification Level` must be `low_verification`.
+
+2.  **Synthesize with Linguistic Features:** Now, consider the `Linguistic Features`.
+    *   The `root_verb` (e.g., "explain", "create", "compare") is a strong clue for the `Intent Type`.
+    *   The `entities` identified by spaCy (e.g., PERSON, ORG, GPE) help confirm the `Entity Type`. A query full of named entities likely needs `high_verification`.
+
+3.  **Interpret the Raw Query's Nuance:** Finally, use your deep language understanding of the `Raw User Query` to resolve any ambiguity and make the final choice for each dimension. For example, "Explain merge sort" vs. "Explain this code" both have the verb "explain," but your analysis of the context and entities should lead you to different `Entity Type` and `Verification Level` classifications.
+
+### OUTPUT CONSTRAINTS ###
+You MUST respond with ONLY a valid JSON object. The JSON object must contain exactly four keys, and the value for each key MUST be one of the allowed options provided below. Do not add any explanation or commentary.
+
+-   **`intent_type`**: (Choose one: `factual_explanation`, `general_qa`, `comparison`, `analytical_reasoning`, `code_generation`, `creative_generation`, `math_computation`, `content_summarization`)
+-   **`entity_type`**: (Choose one: `specific_person_or_event`, `organization_or_product`, `broad_concept`, `user_provided_content`, `abstract_idea`)
+-   **`information_scope`**: (Choose one: `comprehensive_overview`, `specific_answer`, `step_by_step_guide`)
+-   **`verification_level`**: (Choose one: `high_verification`, `medium_verification`, `low_verification`)
+"""
+    
     try:
-        # 1. Select the fast model and configure for JSON output
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+            model_name="gemini-2.5-flash", # Use a capable model
             generation_config={"response_mime_type": "application/json"}
         )
-
-        # 2. Craft the classification system prompt
-        system_prompt = """
-        You are an expert query classifier. Your task is to determine if a user's prompt requires a real-time web search to answer accurately or if it can be answered directly by a large language model.
-
-        Categorize the prompt into one of two paths:
-        1.  `search_required`: For questions about recent events, specific facts, products, people, companies, or any topic that requires up-to-date, external information.
-        2.  `direct_answer`: For self-contained questions like math problems, logic puzzles, creative writing requests, coding tasks, summarization of provided text, or general knowledge questions where real-time data is not essential.
-
-        You must respond with ONLY a valid JSON object with a single key "path" and one of the two string values.
-        Example: {"path": "search_required"}
-        """
-        
-        # 3. Make the API call
-        response = model.generate_content([system_prompt, "user: ", prompt])
-        
-        # 4. Parse and validate the response
-        decision = json.loads(response.text)
-        path = decision.get("path")
-        
-        if path not in ["search_required", "direct_answer"]:
-            # Handle cases where the LLM returns an invalid value
-            print(f"🚨 [SERVICES] Invalid path value received: '{path}'. Defaulting to search.")
-            return "search_required"
-            
-        print(f"✅ [SERVICES] Path decided: '{path}'")
-        return path
-
+        response = model.generate_content(system_prompt)
+        return json.loads(response.text)
     except Exception as e:
-        # 5. Fail-safe: If anything goes wrong, default to the more robust search path
-        print(f"🚨 [SERVICES] An error occurred in decide_query_path: {e}. Defaulting to 'search_required'.")
-        return "search_required"
-    
+        print(f"🚨 [CLASSIFIER STAGE 2] Error during LLM classification: {e}")
+        # Return a default, safe classification that favors searching
+        return {
+            "intent_type": "general_qa",
+            "entity_type": "broad_concept",
+            "information_scope": "specific_answer",
+            "verification_level": "medium_verification",
+        }
 
-decide_query_path_async = sync_to_async(decide_query_path, thread_sensitive=True)
+
+def generate_nlp_features_and_scores(prompt: str, context_metadata: Dict[str, bool]) -> Dict[str, float]:
+    """
+    The main function for Stage 2. Orchestrates NLP processing, LLM classification,
+    and programmatic scoring.
     
+    Args:
+        prompt: The raw user query.
+        context_metadata: The output from Stage 1.
+
+    Returns:
+        A dictionary of the final six numerical scores.
+    """
+    print("✅ [CLASSIFIER STAGE 2] Generating NLP features and scores...")
+    
+    # 1. Deterministic NLP Processing (via spaCy)
+    linguistic_features = _get_linguistic_features(prompt)
+    print(f"  > Linguistic Features (spaCy): {linguistic_features}")
+    
+    # 2. LLM as a Categorical Classifier
+    llm_classifications = _get_llm_classifications(prompt, linguistic_features, context_metadata)
+    print(f"  > LLM Classifications: {llm_classifications}")
+
+    # 3. Programmatic Score Mapping
+    scores = {}
+
+    # Map classifications to scores
+    scores['intent_type_score'] = SCORE_MAPPING['intent_type'].get(llm_classifications.get('intent_type'), 0.5)
+    scores['entity_dynamism_score'] = SCORE_MAPPING['entity_type'].get(llm_classifications.get('entity_type'), 0.5)
+    scores['comprehensiveness_score'] = SCORE_MAPPING['information_scope'].get(llm_classifications.get('information_scope'), 0.5)
+    scores['verification_need_score'] = SCORE_MAPPING['verification_level'].get(llm_classifications.get('verification_level'), 0.5)
+
+    # Directly use metadata for the last two scores, with some nuance
+    if context_metadata['has_attached_content']:
+        scores['context_dependency_score'] = 0.9
+        # Override entity dynamism if it's user content
+        scores['entity_dynamism_score'] = 0.1 
+    else:
+        scores['context_dependency_score'] = 0.1
+
+    if context_metadata['is_temporal']:
+        scores['temporal_urgency_score'] = 0.9
+        # Override dynamism if it's temporal
+        scores['entity_dynamism_score'] = max(scores.get('entity_dynamism_score', 0.5), 0.8)
+    else:
+        scores['temporal_urgency_score'] = 0.1
+
+    print(f"  > Final Scores: {scores}")
+    return scores
+
+# Final call 
+
+CLASSIFIER_WEIGHTS = {
+    'intent_type_score': 0.32,
+    'entity_dynamism_score': 0.20,
+    'temporal_urgency_score': 0.20,
+    # CRITICAL: This weight is NEGATIVE. High context dependency strongly
+    # penalizes the score, pushing it towards a direct answer.
+    'context_dependency_score': -0.25, # Adjusted for stronger impact
+    'verification_need_score': 0.18, # Slightly increased weight
+    'comprehensiveness_score': 0.05,
+}
+
+# The threshold determines the cutoff for triggering a web search.
+# A higher score indicates a stronger signal for needing web access.
+DECISION_THRESHOLD = 0.50
+
+def make_routing_decision(scores: Dict[str, float]) -> str:
+    """
+    Takes the final numerical scores and applies a weighted formula to make
+    the definitive routing decision. This is a purely deterministic calculation.
+
+    Args:
+        scores: A dictionary of the six numerical scores from Stage 2.
+
+    Returns:
+        A string: 'search_required' or 'direct_answer'.
+    """
+    print("✅ [CLASSIFIER STAGE 3] Making final routing decision...")
+
+    # Ensure all expected scores are present, defaulting to a neutral 0.5 if not
+    required_keys = CLASSIFIER_WEIGHTS.keys()
+    for key in required_keys:
+        if key not in scores:
+            print(f"  > WARNING: Missing score for '{key}'. Defaulting to 0.5.")
+            scores[key] = 0.5
+
+    # Calculate the final weighted score
+    decision_score = (
+        scores['intent_type_score'] * CLASSIFIER_WEIGHTS['intent_type_score'] +
+        scores['entity_dynamism_score'] * CLASSIFIER_WEIGHTS['entity_dynamism_score'] +
+        scores['temporal_urgency_score'] * CLASSIFIER_WEIGHTS['temporal_urgency_score'] +
+        scores['context_dependency_score'] * CLASSIFIER_WEIGHTS['context_dependency_score'] +
+        scores['verification_need_score'] * CLASSIFIER_WEIGHTS['verification_need_score'] +
+        scores['comprehensiveness_score'] * CLASSIFIER_WEIGHTS['comprehensiveness_score']
+    )
+    
+    print(f"  > Calculated Decision Score: {decision_score:.4f}")
+    print(f"  > Comparison Threshold: {DECISION_THRESHOLD}")
+
+    # Apply the threshold to make the final decision
+    if decision_score > DECISION_THRESHOLD:
+        path = "search_required"
+    else:
+        path = "direct_answer"
+        
+    print(f"  > Final Path Decided: '{path}'")
+    return path
+
+async def get_intelligent_path(prompt: str) -> str:
+    """
+    The main orchestrator for the intelligent classification pipeline.
+    This function runs the complete 3-stage analysis.
+    """
+    print("🚀 STARTING INTELLIGENT CLASSIFICATION PIPELINE 🚀")
+    # Stage 1: Fast, rule-based metadata extraction
+    context_metadata = extract_contextual_metadata(prompt)
+    
+    # Stage 2: NLP processing, LLM classification, and scoring
+    # Run the synchronous Stage 2 function in a separate thread to avoid blocking.
+    loop = asyncio.get_running_loop()
+    # The LLM call inside generate_nlp_features_and_scores is blocking,
+    # so we use run_in_executor to not freeze our async server.
+    scores = await loop.run_in_executor(
+        None, generate_nlp_features_and_scores, prompt, context_metadata
+    )
+    
+    # Stage 3: Deterministic, weighted decision making
+    final_path = make_routing_decision(scores)
+    print(f"🏁 INTELLIGENT PIPELINE FINISHED. Final Path: {final_path} 🏁")
+    
+    return final_path
+
+
 
 
 # stage 2
