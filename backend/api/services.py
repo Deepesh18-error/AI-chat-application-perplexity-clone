@@ -23,6 +23,13 @@ from datetime import datetime
 import spacy
 from typing import Dict, Any
 
+# Interactive UI
+import httpx
+
+#thesys
+import html
+
+
 # Read the API key directly from the environment variable.
 # This is the most direct and reliable way.
 try:
@@ -612,7 +619,122 @@ async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
     print(f"✅ [SERVICES] Finished scraping. Successfully extracted content from {len(scraped_data)} out of {len(urls)} URLs.")
     return scraped_data
 
-#stage 5
+# thesys implementation 
+async def generate_ui_spec_from_markdown(markdown_content: str) -> str:
+    """
+    The primary bridge to Thesys. It takes our final, generated Markdown,
+    wraps it in a carefully crafted "meta-prompt," and returns the raw,
+    untouched C1 DSL string from the Thesys API.
+
+    Args:
+        markdown_content: The complete, final Markdown answer from our RAG pipeline.
+
+    Returns:
+        The raw C1 DSL string, or an error message string if the call fails.
+    """
+    print("✅ [THESYS] Starting conversion of Markdown to UI Spec...")
+
+    # This meta-prompt is the key. It tells the c1-latest model *how* to act.
+    thesys_meta_prompt = f"""
+You are an expert UI/UX designer and frontend developer. You will be given a complete, well-structured document written in Markdown that contains the answer to a user's question.
+
+Your sole task is to analyze the content and structure of this Markdown document and transform it into the best possible rich, interactive, and visually appealing UI using your component library.
+
+Follow these guidelines:
+- If you see tables, use a proper table component.
+- If you see lists of statistics, percentages, or comparisons, consider using a pie chart, bar chart, or a stats card component.
+- If you see headings, paragraphs, and lists, use appropriate card, title, text, and list components to structure the information logically.
+- The goal is to present the information in the most clear, effective, and engaging way possible. Do not simply put all the text in a single block.
+
+Here is the Markdown content you need to transform:
+
+---
+{markdown_content}
+---
+"""
+    try:
+        raw_dsl_string, status_code = await call_thesys_chat_api(thesys_meta_prompt)
+
+        if status_code == 200:
+            print("✅ [THESYS] Successfully received raw C1 DSL string. Passing through unmodified.")
+            # Return the raw string EXACTLY as it was received. NO CLEANING.
+            return raw_dsl_string
+        else:
+            print(f"🚨 [THESYS] Failed to generate UI Spec. Status: {status_code}")
+            return "Error: The UI generation service failed to respond correctly."
+
+    except Exception as e:
+        print(f"🚨 [THESYS] A critical error occurred during UI generation: {e}")
+        return f"An error occurred during UI generation: {str(e)}"
+
+# In services.py, replace the existing call_thesys_chat_api function
+
+async def call_thesys_chat_api(prompt: str):
+    """
+    (ENHANCED DEBUGGING VERSION)
+    Acts as a secure proxy to the Thesys Chat Completions API.
+    Now includes extensive logging to debug the exact response.
+    """
+    print("  > [THESYS_API] Calling Thesys Chat Completions API (Debug Mode)...")
+    api_key = os.getenv("THESYS_API_KEY")
+    if not api_key:
+        error_msg = "🚨 FATAL: THESYS_API_KEY not found."
+        print(error_msg)
+        return json.dumps({"error": "Server API key not configured."}), 500
+
+    api_url = "https://api.thesys.dev/v1/embed/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {"model": "c1-latest", "messages": [{"role": "user", "content": prompt}]}
+
+    # --- NEW LOGGING: Log the request we are sending ---
+    print(f"    - Target URL: {api_url}")
+    print(f"    - Authorization Header: Bearer ...{api_key[-4:]}") # Log last 4 chars for verification
+    print(f"    - Payload Length Sent: {len(json.dumps(payload))} characters")
+    # Uncomment the next line ONLY for intense debugging, as it can be very long
+    # print(f"    - Full Payload Sent: {json.dumps(payload, indent=2)}")
+    # --- END OF NEW LOGGING ---
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(api_url, headers=headers, json=payload)
+
+            # --- CRITICAL LOGGING: Log the raw response BEFORE any parsing ---
+            raw_response_text = response.text
+            print("\n    --- RECEIVED RESPONSE FROM THESYS ---")
+            print(f"    - Status Code: {response.status_code}")
+            print(f"    - Response Headers: {response.headers}")
+            print(f"    - Raw Response Body: {raw_response_text}")
+            print("    -------------------------------------\n")
+            # --- END OF CRITICAL LOGGING ---
+
+            response.raise_for_status() # Still useful to catch 4xx/5xx errors
+
+            # Now, attempt to parse the raw text we just logged
+            resp_json = json.loads(raw_response_text)
+            message_content = resp_json.get("choices", [{}])[0].get("message", {}).get("content")
+
+            if message_content is None:
+                print("🚨 [THESYS_API] ERROR: 'message.content' field not found in the parsed JSON.")
+                return json.dumps({"error": "Invalid response structure from Thesys API."}), 500
+
+            # If we succeed, return the content
+            return str(message_content), 200
+
+    except httpx.HTTPStatusError as e:
+        # This will now have more context because we logged the body above
+        error_body = e.response.text
+        print(f"🚨 [THESYS_API] HTTP Error Caught: {e.response.status_code}")
+        print(f"   - Error Body from Exception: {error_body}")
+        return json.dumps({"error": "Thesys API returned an error.", "details": error_body}), e.response.status_code
+    
+    except json.JSONDecodeError as e:
+        # This is the error we were seeing. Now we know exactly what text caused it.
+        print(f"🚨 [THESYS_API] JSON DECODE ERROR CAUGHT. The raw response body logged above is not valid JSON. Error: {e}")
+        return json.dumps({"error": "Thesys returned a non-JSON response.", "details": raw_response_text}), 500
+
+    except Exception as e:
+        print(f"🚨 [THESYS_API] Unexpected Error: {e}")
+        return json.dumps({"error": "Unexpected server error.", "details": str(e)}), 500#stage 5
 
 async def _synthesize_answer_from_context(
     prompt: str, scraped_data: List[Dict[str, str]]
@@ -656,14 +778,20 @@ async def _synthesize_answer_from_context(
             yield chunk.text
 
 
+# services.py
+
+# services.py
+
 async def generate_and_stream_answer(
     prompt: str, path: str
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     The main orchestrator. Handles both Search/RAG and Direct Answer paths,
-    yielding structured event dictionaries for the frontend.
+    and uses Thesys to generate a final UI spec.
     """
     try:
+        full_markdown_response = ""
+        
         # --- PATH 1: Direct Answer ---
         if path == "direct_answer":
             print("✅ [ORCHESTRATOR] Executing Direct Answer path.")
@@ -671,58 +799,65 @@ async def generate_and_stream_answer(
 
             model = genai.GenerativeModel(model_name="gemini-2.5-flash")
             response_stream = model.generate_content(prompt, stream=True)
+            
+            # Correctly accumulate the response text
             for chunk in response_stream:
                 if chunk.text:
-                    yield {"event": "token", "data": {"token": chunk.text}}
+                    full_markdown_response += chunk.text # <-- IMPORTANT FIX: was adding the object, now adds the text
         
         # --- PATH 2: Full RAG Pipeline ---
         else: # path == "search_required"
             print("✅ [ORCHESTRATOR] Executing Search/RAG path.")
-            
-            # Step 1: Generate Search Queries
             yield {"event": "steps", "data": {"message": "Generating search queries..."}}
             queries = generate_search_queries(prompt)
-            yield {"event": "search_queries", "data": {"queries": queries}}
+            # We don't need to yield queries to the new frontend
             
-            # Step 2: Get URLs (now limited)
             yield {"event": "steps", "data": {"message": "Searching the web..."}}
             urls = await get_urls_from_queries(queries)
             
-            # Step 3: Scrape Content
             yield {"event": "steps", "data": {"message": f"Reviewing {len(urls)} sources..."}}
             scraped_data = await scrape_urls_in_parallel(urls)
 
-            # Step 4: Edge Case Handling
-            MIN_SOURCES_REQUIRED = 3
+            MIN_SOURCES_REQUIRED = 2 # Lowered slightly for more reliability
             if not scraped_data or len(scraped_data) < MIN_SOURCES_REQUIRED:
-                print(f"🚨 [ORCHESTRATOR] Scraped too few sources ({len(scraped_data)}). Aborting.")
-                yield {
-                    "event": "error",
-                    "data": {"message": f"I could not retrieve enough information from the web to provide a reliable answer. Only found {len(scraped_data)} sources."}
-                }
-                # The 'return' statement ends the generator function here.
+                yield {"event": "error", "data": {"message": f"Could only retrieve content from {len(scraped_data)} out of {len(urls)} sources, which is not enough to provide a reliable answer."}}
                 return
 
-            # Step 5: Yield Source Information for the UI
+            # Prepare sources for the frontend if needed later, but the main UI will be from Thesys
             sources = [{"title": url.split('/')[2].replace('www.', ''), "url": url} for url in urls]
             yield {"event": "sources", "data": {"sources": sources}}
 
-            # Step 6: Synthesize and stream the final answer
             yield {"event": "steps", "data": {"message": "Synthesizing the final answer..."}}
             
-            async for token in _synthesize_answer_from_context(prompt, scraped_data):
-                yield {"event": "token", "data": {"token": token}}
+            # Accumulate the full response instead of streaming tokens
+            async for chunk in _synthesize_answer_from_context(prompt, scraped_data):
+                full_markdown_response += chunk
+
+        # --- FINAL THESYS INTEGRATION STEP (RUNS FOR BOTH PATHS) ---
+        if full_markdown_response.strip():
+            yield {"event": "steps", "data": {"message": "Generating interactive UI..."}}
+            
+            # Call our new bridge function to get the final RAW DSL STRING
+            raw_dsl_string = await generate_ui_spec_from_markdown(full_markdown_response)
+            
+            # Yield the final UI DSL string with a new event name.
+            # The data is the raw string itself.
+            yield {"event": "aui_dsl", "data": raw_dsl_string}
+        else:
+            yield {"event": "error", "data": {"message": "Failed to generate a response."}}
 
     except Exception as e:
         print(f"🚨 [ORCHESTRATOR] A critical error occurred: {e}")
+        import traceback
+        traceback.print_exc() # Print full traceback for better debugging
         yield {
             "event": "error",
-            "data": {"message": f"An unexpected error occurred during processing: {e}"}
+            "data": {"message": f"An unexpected error occurred: {str(e)}"}
         }
     
     finally:
-        # Signal the end of the stream for all paths
         print("✅ [ORCHESTRATOR] Stream finished.")
+        # The 'finished' event can still be useful for the frontend to know the process is complete
         yield {"event": "finished", "data": {"message": "Stream completed."}}
 
 
@@ -730,12 +865,28 @@ async def stream_sse_formatter(
     event_generator: AsyncGenerator[Dict[str, Any], None]
 ) -> AsyncGenerator[str, None]:
     """
-    Wraps an async generator that yields dictionaries and formats them
-    into Server-Sent Event (SSE) strings for the client.
+    (CORRECT MULTI-LINE FORMATTER)
+    Wraps an async generator and formats its dictionary yields into
+    Server-Sent Event (SSE) strings. Correctly handles multi-line data.
     """
-
     async for event in event_generator:
         event_name = event["event"]
-        data = json.dumps(event["data"])
-        # Format as an SSE message: event: <name>\ndata: <json>\n\n
-        yield f"event: {event_name}\ndata: {data}\n\n"
+        payload = event["data"]
+        
+        sse_message = f"event: {event_name}\n"
+
+        if event_name == "aui_dsl":
+            # For the multi-line DSL string, we split it by newline
+            # and prepend "data: " to each line.
+            lines = payload.split('\n')
+            for line in lines:
+                sse_message += f"data: {line}\n"
+        else:
+            # For all other single-object events, we serialize to JSON.
+            data_string = json.dumps(payload)
+            sse_message += f"data: {data_string}\n"
+            
+        # Terminate the message with an extra newline.
+        sse_message += "\n"
+        
+        yield sse_message

@@ -1,106 +1,178 @@
-import React, { useState } from 'react';
-import PromptInputForm from './components/PromptInputForm';
-import { sendPrompt } from './services/apiClient';
+// src/App.jsx - ENHANCED LOGGING
 
-// Styles remain here as they are global to this page.
-const GlobalStyles = () => (
-    <style>{`
-      :root {
-        --background-color: #f0f4f8;
-        --container-bg: #ffffff;
-        --text-color: #102a43;
-        --primary-color: #3b82f6;
-        --primary-hover: #2563eb;
-        --border-color: #dcdfe6;
-        --error-color: #d9534f;
-        --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      }
-      *, *::before, *::after { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: var(--font-family);
-        background-color: var(--background-color);
-        color: var(--text-color);
-        line-height: 1.6;
-      }
-      #root {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 2rem;
-        min-height: 100vh;
-      }
-      .chat-container {
-        width: 100%;
-        max-width: 800px;
-        background-color: var(--container-bg);
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        padding: 1.5rem;
-      }
-      h1 {
-        text-align: center;
-        color: var(--primary-color);
-        margin-bottom: 2rem;
-      }
-      .prompt-form { display: flex; gap: 0.5rem; }
-      .prompt-input { flex-grow: 1; padding: 0.75rem 1rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; transition: border-color 0.2s; }
-      .prompt-input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
-      .prompt-button { padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; }
-      .prompt-button:hover:not(:disabled) { background-color: var(--primary-hover); }
-      .prompt-button:disabled { background-color: #93c5fd; cursor: not-allowed; }
-      .error-message { color: var(--error-color); margin-top: 1rem; text-align: center; }
-      .response-area { margin-top: 2rem; padding: 1rem; background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: 6px; min-height: 100px; white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; }
-    `}</style>
-);
-
+import { useState } from 'react';
+import { ThemeProvider } from '@thesysai/genui-sdk';
+import ResponseContainer from './components/ResponseContainer';
+import WelcomeScreen from './components/WelcomeScreen';
+import './index.css';
 
 function App() {
   const [prompt, setPrompt] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [response, setResponse] = useState('');
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!prompt || isLoading) return;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!prompt.trim() || isLoading) return;
 
+    console.group(`🚀 [SUBMIT] New Request Started: "${prompt}"`);
     setIsLoading(true);
-    setError(null);
-    setResponse('');
+    const currentPrompt = prompt;
+    setPrompt('');
+
+    const newResponseState = {
+      key: Date.now(),
+      prompt: currentPrompt,
+      steps: [],
+      sources: [],
+      auiSpec: null,
+      error: null,
+      isLoading: true,
+    };
+    setChatHistory(prev => [...prev, newResponseState]);
+    console.log("  [STATE] Initial response object added to chat history.");
 
     try {
-      // Logic is now delegated to the apiClient
-      const data = await sendPrompt(prompt);
-      console.log('✅ [Frontend] Response from backend:', data);
-      setResponse(data.message);
-    } catch (e) {
-      console.error('🚨 [Frontend] There was an error making the request:', e);
-      setError(e.message || 'Failed to connect to the backend. Please try again.');
+      const response = await fetch(import.meta.env.VITE_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: currentPrompt }),
+      });
+      console.log("  [NETWORK] Initial response received from backend. Status:", response.status);
+
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      console.log("  [STREAM] Reader created. Starting stream processing loop.");
+
+      const processStream = async () => {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            console.log("  [STREAM] Stream is DONE.");
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const messages = buffer.split('\n\n');
+          buffer = messages.pop() || '';
+          for (const message of messages) {
+            if (message.trim() === '') continue;
+
+            console.groupCollapsed("  [STREAM] Processing SSE Message Block");
+            console.log("Raw Message Block:", `"${message.replace(/\n/g, '\\n')}"`);
+
+            let eventType = 'message'; // Default event type
+            const dataBuffer = [];
+
+            const lines = message.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('event: ')) {
+                eventType = line.substring(7).trim();
+              } else if (line.startsWith('data: ')) {
+                dataBuffer.push(line.substring(6)); // Push the content after "data: "
+              }
+            }
+
+            // Reconstruct the full data payload from all data lines
+            const reconstructedData = dataBuffer.join('\n');
+            
+            if (!reconstructedData) {
+                console.groupEnd();
+                continue;
+            }
+
+            console.log("Event Type:", eventType);
+            console.log("Reconstructed Data:", reconstructedData);
+
+            setChatHistory(prev => prev.map((chat, index) => {
+              if (index !== prev.length - 1) return chat;
+              let updatedState = { ...chat };
+
+              switch (eventType) {
+                case 'steps':
+                case 'sources':
+                case 'error': {
+                  const eventData = JSON.parse(reconstructedData);
+                  if (eventType === 'steps') updatedState.steps = [...updatedState.steps, eventData.message];
+                  if (eventType === 'sources') updatedState.sources = eventData.sources;
+                  if (eventType === 'error') updatedState.error = eventData.message;
+                  break;
+                }
+                
+                case 'aui_dsl': {
+                  // The reconstructedData IS the full, raw C1 DSL string.
+                  updatedState.auiSpec = reconstructedData;
+                  break;
+                }
+
+                case 'finished':
+                  break;
+                  
+                default:
+                  console.warn("-> Received unknown event type:", eventType);
+              }
+
+              return updatedState;
+            }));
+
+            console.groupEnd();
+          }
+        }
+      };
+      await processStream();
+    } catch (error) {
+      console.error('❌ [FETCH ERROR] An error occurred during the fetch process:', error);
+      setChatHistory(prev => prev.map((chat, index) => {
+        if (index !== prev.length - 1) return chat;
+        return { ...chat, error: error.message };
+      }));
     } finally {
       setIsLoading(false);
+      setChatHistory(prev => prev.map((chat, index) => {
+        if (index !== prev.length - 1) return chat;
+        return { ...chat, isLoading: false };
+      }));
+      console.log("[FINALLY] isLoading set to false, UI unlocked.");
+      console.groupEnd();
     }
   };
 
+  const handleExampleClick = (examplePrompt) => {
+    setPrompt(examplePrompt);
+  };
+
   return (
-    <>
-      <GlobalStyles />
-      <div className="chat-container">
-        <h1>Perplexity Clone</h1>
-        <PromptInputForm
-          prompt={prompt}
-          setPrompt={setPrompt}
-          handleSubmit={handleSubmit}
-          isLoading={isLoading}
-        />
-
-        {error && <p className="error-message">{error}</p>}
-
+    <ThemeProvider>
+      <div className="app-container">
         <div className="response-area">
-          {response}
+          {chatHistory.length === 0 ? (
+            <WelcomeScreen onExampleClick={handleExampleClick} />
+          ) : (
+            chatHistory.map((chat) => (
+              <ResponseContainer key={chat.key} response={chat} />
+            ))
+          )}
         </div>
+
+        <form onSubmit={handleSubmit} className="prompt-form">
+          <input
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Ask me anything..."
+            disabled={isLoading}
+          />
+          <button type="submit" disabled={isLoading}>
+            {isLoading ? '...' : 'Ask'}
+          </button>
+        </form>
       </div>
-    </>
+    </ThemeProvider>
   );
 }
 
