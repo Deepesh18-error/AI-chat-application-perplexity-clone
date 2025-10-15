@@ -54,6 +54,7 @@ function App() {
     isLoading: true,
     summary: null,
     entities: [],
+    images: [],
   };
     setChatHistory(prev => [...prev, newResponseState]);
     console.log("  [STATE] Initial response object added to chat history.");
@@ -133,6 +134,17 @@ function App() {
                   if (eventType === 'steps') updatedState.steps = [...updatedState.steps, eventData.message];
                   if (eventType === 'sources') updatedState.sources = eventData.sources;
                   if (eventType === 'error') updatedState.error = eventData.message;
+                  break;
+                }
+                
+                case 'images': {
+                  try {
+                    const eventData = JSON.parse(reconstructedData);
+                    updatedState.images = eventData.images;
+                    console.log("  [STATE] Received and stored image data.", eventData.images);
+                  } catch (e) {
+                    console.error("  [STATE] Failed to parse images JSON:", e, reconstructedData);
+                  }
                   break;
                 }
                 

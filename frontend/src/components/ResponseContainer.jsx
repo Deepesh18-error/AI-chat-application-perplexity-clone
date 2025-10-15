@@ -1,16 +1,15 @@
-// src/components/ResponseContainer.jsx
-
 import React, { useState } from 'react';
-// --- CORRECT IMPORTS ---
-// We only need C1Component here, as ThemeProvider is now in App.jsx
+
 import { C1Component } from '@thesysai/genui-sdk'; 
-import { BsFileText, BsLink45Deg, BsCheck2Square } from 'react-icons/bs';
 import SourceCard from './SourceCard';
 import StepsTimeline from './StepsTimeline';
+import { BsFileText, BsLink45Deg, BsCheck2Square, BsImages } from 'react-icons/bs';
+import ImageGrid from './ImageGrid';
 
 function ResponseContainer({ response }) {
   const [activeTab, setActiveTab] = useState('answer');
   const isSearch = response.sources && response.sources.length > 0;
+  const hasImages = response.images && response.images.length > 0;
 
   return (
     // --- REMOVE THE REDUNDANT ThemeProvider WRAPPER FROM THIS FILE ---
@@ -28,6 +27,14 @@ function ResponseContainer({ response }) {
             <BsLink45Deg /> Sources · {response.sources.length}
           </button>
         )}
+
+        {hasImages && (
+          <button onClick={() => setActiveTab('images')} className={activeTab === 'images' ? 'active' : ''}>
+            <BsImages /> Images · {response.images.length}
+          </button>
+        )}
+
+        
         <button onClick={() => setActiveTab('steps')} className={activeTab === 'steps' ? 'active' : ''}>
           <BsCheck2Square /> Steps
         </button>
@@ -54,6 +61,11 @@ function ResponseContainer({ response }) {
             ))}
           </div>
         )}
+
+        {activeTab === 'images' && hasImages && (
+          <ImageGrid images={response.images} />
+        )}
+
         {activeTab === 'steps' && (
           <StepsTimeline steps={response.steps} isLoading={response.isLoading}/>
         )}

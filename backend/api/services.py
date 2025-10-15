@@ -525,6 +525,49 @@ async def _search_tavily_async(query: str) -> List[Dict[str, Any]]:
         return []
 
 
+async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
+    """
+    An asynchronous helper function to fetch ONLY image results for a given query
+    using the Tavily Search API. This function is designed for resilience.
+
+    Args:
+        query: The search query string optimized for finding images.
+
+    Returns:
+        A list of image result dictionaries from Tavily, or an empty list if an error occurs.
+    """
+    try:
+        # We add "IMAGE" to the log to clearly distinguish this from the text search.
+        print(f"  > Starting IMAGE search for: '{query}'")
+
+        tavily_api_key = os.getenv("TAVILY_API_KEY")
+        if not tavily_api_key:
+            print("🚨 TAVILY_API_KEY not found in environment variables.")
+            return []
+        
+        tavily_client = AsyncTavilyClient(api_key=tavily_api_key)
+        
+        # The core of this function: make the API call with include_images=True
+        response = await tavily_client.search(
+            query=query,
+            search_depth="basic",    # 'basic' is faster and sufficient for images.
+            include_images=True,     # The critical parameter to request image results.
+            max_results=15          # A reasonable limit for the number of images.
+        )
+        
+        # Instead of "results", we extract the "images" key from the response.
+        # .get() is used for safety, returning [] if the "images" key is not found.
+        images = response.get("images", [])
+        
+        print(f"  < Finished IMAGE search for: '{query}'. Found {len(images)} images.")
+        return images
+        
+    except Exception as e:
+        # If any error occurs, log it and return an empty list to prevent crashes.
+        print(f"  🚨 Error during IMAGE search for '{query}': {e}")
+        return []
+
+
 async def get_urls_from_queries(queries: List[str]) -> List[str]:
     """
     Takes a list of search queries, fetches results concurrently, and returns
@@ -794,13 +837,53 @@ async def generate_and_stream_answer(
         else: # path == "search_required"
             print("✅ [ORCHESTRATOR] Executing Search/RAG path.")
             yield {"event": "steps", "data": {"message": "Generating search queries..."}}
-            # --- FIX: Pass context_package to the query generator ---
+            
             queries = generate_search_queries(prompt, context_package)
-            # --- END OF FIX ---
-            yield {"event": "steps", "data": {"message": "Searching the web..."}}
-            urls = await get_urls_from_queries(queries)
+
+            # Safety check: If query generation fails, stop here.
+            if not queries:
+                yield {"event": "error", "data": {"message": "Failed to generate search queries."}}
+                return
+
+            # Update the step message to reflect the parallel search
+            yield {"event": "steps", "data": {"message": "Searching for text and images..."}}
+
+            # --- STEP 2: EXECUTE CONCURRENTLY WITH ASYNCIO.GATHER ---
+            # We select the first, most general query for the image search.
+            image_search_query = queries[0] 
+            print(f"✅ [ORCHESTRATOR] Starting parallel search. Image query: '{image_search_query}'")
+
+            # Create the two tasks to be run at the same time.
+            text_urls_task = get_urls_from_queries(queries)
+            image_results_task = _get_images_from_tavily_async(image_search_query)
+
+            # Await both tasks concurrently. This is the performance optimization.
+            # `urls` will contain the result of the first task, `images` the second.
+            urls, images = await asyncio.gather(
+                text_urls_task,
+                image_results_task
+            )
+            print(f"✅ [ORCHESTRATOR] Parallel search complete. Found {len(urls)} text URLs and {len(images)} images.")
+
+            # --- STEP 3: CREATE AND STREAM THE NEW "IMAGES" SSE EVENT ---
+            # This happens immediately after the images are fetched, before scraping.
+            if images: # Only send the event if we actually found images.
+                print("✅ [ORCHESTRATOR] PREPARING TO STREAM 'images' EVENT.")
+                print(f"  > DATA BEING SENT: {json.dumps({'images': images}, indent=2)}")
+                # --- END OF DIAGNOSTIC LOG ---
+
+                yield {"event": "images", "data": {"images": images}}
+                print("✅ [ORCHESTRATOR] 'images' event successfully yielded to stream.")
+            else:
+                # --- NEW DIAGNOSTIC LOG FOR NO IMAGES ---
+                print("🟡 [ORCHESTRATOR] No images found by Tavily. Skipping 'images' event.")
+
+
+            # --- RESUME THE ORIGINAL FLOW ---
+            # The rest of the code proceeds as before, using the `urls` variable.
             yield {"event": "steps", "data": {"message": f"Reviewing {len(urls)} sources..."}}
             scraped_data = await scrape_urls_in_parallel(urls)
+
             MIN_SOURCES_REQUIRED = 2
             if not scraped_data or len(scraped_data) < MIN_SOURCES_REQUIRED:
                 yield {"event": "error", "data": {"message": f"Could only retrieve content from {len(scraped_data)} sources."}}
