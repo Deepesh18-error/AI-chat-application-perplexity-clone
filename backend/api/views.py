@@ -9,36 +9,39 @@ from . import services
 @csrf_exempt
 @require_http_methods(["POST"])
 async def generate_view(request):
-    """
-    The main API endpoint for the Perplexity Clone.
-    It receives a prompt, determines the correct execution path,
-    and streams back the results as Server-Sent Events (SSE).
+    """(FINAL CORRECTED VERSION)
+    Receives session/context and passes it correctly to the services layer.
     """
     print("\n--- [VIEW] Received new generation request ---")
     try:
         data = json.loads(request.body)
         prompt = data.get("prompt")
+        # --- RECEIVE ALL DATA FROM FRONTEND ---
+        session_id = data.get("session_id")
+        turn_number = data.get("turn_number")
+        context_package = data.get("context_package", {})
 
-        if not prompt:
-            print("🚨 [VIEW] Request failed: No prompt provided.")
-            return JsonResponse({"error": "Prompt is required in the request body."}, status=400)
+        if not prompt or not session_id or not turn_number:
+            error_msg = "Prompt, session_id, and turn_number are required."
+            print(f"🚨 [VIEW] Request failed: {error_msg}")
+            return JsonResponse({"error": error_msg}, status=400)
 
         print(f"✅ [VIEW] Prompt received: '{prompt[:100]}...'")
+        print(f"  > Session ID: {session_id}, Turn: {turn_number}")
         
-        # 1. Use the Intelligent Classifier to decide the path
-        path = await services.get_intelligent_path(prompt)
+        # --- FIX: Call get_intelligent_path with the correct arguments ---
+        path = await services.get_intelligent_path(prompt, context_package)
         
-        # 2. Get the main event generator from the orchestrator
-        event_generator = services.generate_and_stream_answer(prompt, path)
+        # --- FIX: Call generate_and_stream_answer with ALL arguments ---
+        event_generator = services.generate_and_stream_answer(
+            prompt, path, session_id, turn_number, context_package
+        )
         
-        # 3. Wrap the generator with the SSE formatter
         sse_stream = services.stream_sse_formatter(event_generator)
         
-        # 4. Return the stream to the client
-        # The 'text/event-stream' content type is essential for SSEs to work.
         response = StreamingHttpResponse(sse_stream, content_type='text/event-stream')
-        response['X-Accel-Buffering'] = 'no'  # Disable buffering for Nginx
-        response['Cache-Control'] = 'no-cache' # Ensure client doesn't cache the stream
+        response['X-Accel-Buffering'] = 'no'
+        response['Cache-Control'] = 'no-cache'
         
         print("✅ [VIEW] Streaming response started.")
         return response

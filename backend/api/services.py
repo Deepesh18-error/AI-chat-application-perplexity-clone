@@ -29,6 +29,11 @@ import httpx
 #thesys
 import html
 
+#database
+from datetime import datetime, timezone
+from .db_config import conversations_collection
+
+
 
 # Read the API key directly from the environment variable.
 # This is the most direct and reliable way.
@@ -49,6 +54,24 @@ class GeminiError(Exception):
     pass
 
 # Contextual metadata extraction 
+
+def _format_context_for_prompt(context_package: Dict[str, Any]) -> str:
+    """Formats the conversation history into a clean, readable string for LLM prompts."""
+    history_str = "No previous conversation history."
+    
+    if context_package and context_package.get('previous_turns'):
+        formatted_turns = []
+        for i, turn in enumerate(context_package['previous_turns'], 1):
+            formatted_turns.append(
+                f"Turn {i}:\n"
+                f"  - User Query: \"{turn.get('query')}\"\n"
+                f"  - Assistant's Summary: \"{turn.get('summary')}\""
+            )
+        if formatted_turns:
+            history_str = "\n".join(formatted_turns)
+            
+    return history_str
+
 
 def extract_contextual_metadata(prompt: str) -> Dict[str, bool]:
     """
@@ -220,17 +243,18 @@ def _get_linguistic_features(prompt: str) -> Dict[str, Any]:
         "is_question": prompt.strip().endswith('?')
     }
 
-def _get_llm_classifications(prompt: str, linguistic_features: Dict[str, Any], context_metadata: Dict[str, Any]) -> Dict[str, str]:
-    """Helper to get semantic classifications from the LLM using a structured prompt."""
+def _get_llm_classifications(prompt: str, linguistic_features: Dict[str, Any], context_metadata: Dict[str, Any], context_package: Dict[str, Any]) -> Dict[str, str]:
+    """(UPDATED FOR CONTEXT) Helper to get semantic classifications from the LLM."""
     
-    # This simulates a POML-style prompt by creating a highly structured text prompt.
-    # A true POML implementation would require a specific library if available.
+    # Use our helper to format the conversation history
+    conversation_history = _format_context_for_prompt(context_package)
+
     system_prompt = f"""
 ### ROLE ###
-You are a highly-tuned NLP classification model. Your purpose is to act as the semantic reasoning core of a sophisticated query processing pipeline. You will receive a user's query along with pre-processed metadata and linguistic features. Your sole task is to analyze all this information and classify the query's core attributes by selecting the most appropriate label for each of the four dimensions.
+You are a highly-tuned NLP classification model. Your purpose is to act as the semantic reasoning core of a sophisticated query processing pipeline. You will receive a user's query, pre-processed metadata, linguistic features, and the conversation history. Your sole task is to analyze all this information and classify the query's core attributes.
 
 ### INPUTS ###
-You will be given three pieces of information to guide your decision:
+You will be given four pieces of information:
 
 1.  **Contextual Metadata (from fast, rule-based checks):**
     ```json
@@ -242,25 +266,25 @@ You will be given three pieces of information to guide your decision:
     {json.dumps(linguistic_features, indent=4)}
     ```
 
-3.  **Raw User Query:**
+3.  **Conversation History:**
+    {conversation_history}
+
+4.  **Raw User Query:**
     `{prompt}`
 
 ### REASONING FRAMEWORK ###
-Before you provide the final JSON output, you must follow this internal reasoning process. This is your "thought process" to arrive at the correct classifications:
+1.  **Analyze Relationship First:** Your primary task is to determine the relationship between the `Raw User Query` and the `Conversation History`.
+    *   Is it a direct follow-up (e.g., "what about its applications?")?
+    *   Is it a completely new, unrelated topic?
+    *   This relationship is the most important signal for your classifications.
 
-1.  **Analyze Context First:** The `Contextual Metadata` provides powerful, high-priority signals.
-    *   If `has_attached_content` is `true`, the `Entity Type` is almost certainly `user_provided_content`, and the `Verification Level` is `low_verification`.
-    *   If `is_temporal` is `true`, the `Verification Level` should be `high_verification`, and the `Entity Type` is likely `specific_person_or_event` or `organization_or_product`.
-    *   If `is_generation_task` is `true`, the `Intent Type` is likely `creative_generation` or `code_generation`, and `Verification Level` must be `low_verification`.
-
-2.  **Synthesize with Linguistic Features:** Now, consider the `Linguistic Features`.
-    *   The `root_verb` (e.g., "explain", "create", "compare") is a strong clue for the `Intent Type`.
-    *   The `entities` identified by spaCy (e.g., PERSON, ORG, GPE) help confirm the `Entity Type`. A query full of named entities likely needs `high_verification`.
-
-3.  **Interpret the Raw Query's Nuance:** Finally, use your deep language understanding of the `Raw User Query` to resolve any ambiguity and make the final choice for each dimension. For example, "Explain merge sort" vs. "Explain this code" both have the verb "explain," but your analysis of the context and entities should lead you to different `Entity Type` and `Verification Level` classifications.
+2.  **Analyze Context & Linguistics:** Now consider the other inputs.
+    *   If `has_attached_content` is `true`, `Entity Type` is likely `user_provided_content`.
+    *   If `is_temporal` is `true`, `Verification Level` should be `high_verification`.
+    *   The `root_verb` (e.g., "explain", "create", "compare") is a strong clue for `Intent Type`.
 
 ### OUTPUT CONSTRAINTS ###
-You MUST respond with ONLY a valid JSON object. The JSON object must contain exactly four keys, and the value for each key MUST be one of the allowed options provided below. Do not add any explanation or commentary.
+You MUST respond with ONLY a valid JSON object with four keys.
 
 -   **`intent_type`**: (Choose one: `factual_explanation`, `general_qa`, `comparison`, `analytical_reasoning`, `code_generation`, `creative_generation`, `math_computation`, `content_summarization`)
 -   **`entity_type`**: (Choose one: `specific_person_or_event`, `organization_or_product`, `broad_concept`, `user_provided_content`, `abstract_idea`)
@@ -270,14 +294,13 @@ You MUST respond with ONLY a valid JSON object. The JSON object must contain exa
     
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash", # Use a capable model
+            model_name="gemini-2.5-flash", 
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(system_prompt)
         return json.loads(response.text)
     except Exception as e:
         print(f"🚨 [CLASSIFIER STAGE 2] Error during LLM classification: {e}")
-        # Return a default, safe classification that favors searching
         return {
             "intent_type": "general_qa",
             "entity_type": "broad_concept",
@@ -286,7 +309,7 @@ You MUST respond with ONLY a valid JSON object. The JSON object must contain exa
         }
 
 
-def generate_nlp_features_and_scores(prompt: str, context_metadata: Dict[str, bool]) -> Dict[str, float]:
+def generate_nlp_features_and_scores(prompt: str, context_metadata: Dict[str, bool], context_package: Dict[str, Any]) -> Dict[str, float]:
     """
     The main function for Stage 2. Orchestrates NLP processing, LLM classification,
     and programmatic scoring.
@@ -300,34 +323,27 @@ def generate_nlp_features_and_scores(prompt: str, context_metadata: Dict[str, bo
     """
     print("✅ [CLASSIFIER STAGE 2] Generating NLP features and scores...")
     
-    # 1. Deterministic NLP Processing (via spaCy)
     linguistic_features = _get_linguistic_features(prompt)
     print(f"  > Linguistic Features (spaCy): {linguistic_features}")
     
-    # 2. LLM as a Categorical Classifier
-    llm_classifications = _get_llm_classifications(prompt, linguistic_features, context_metadata)
+    llm_classifications = _get_llm_classifications(prompt, linguistic_features, context_metadata, context_package)
+
     print(f"  > LLM Classifications: {llm_classifications}")
 
-    # 3. Programmatic Score Mapping
     scores = {}
-
-    # Map classifications to scores
     scores['intent_type_score'] = SCORE_MAPPING['intent_type'].get(llm_classifications.get('intent_type'), 0.5)
     scores['entity_dynamism_score'] = SCORE_MAPPING['entity_type'].get(llm_classifications.get('entity_type'), 0.5)
     scores['comprehensiveness_score'] = SCORE_MAPPING['information_scope'].get(llm_classifications.get('information_scope'), 0.5)
     scores['verification_need_score'] = SCORE_MAPPING['verification_level'].get(llm_classifications.get('verification_level'), 0.5)
 
-    # Directly use metadata for the last two scores, with some nuance
     if context_metadata['has_attached_content']:
         scores['context_dependency_score'] = 0.9
-        # Override entity dynamism if it's user content
         scores['entity_dynamism_score'] = 0.1 
     else:
         scores['context_dependency_score'] = 0.1
 
     if context_metadata['is_temporal']:
         scores['temporal_urgency_score'] = 0.9
-        # Override dynamism if it's temporal
         scores['entity_dynamism_score'] = max(scores.get('entity_dynamism_score', 0.5), 0.8)
     else:
         scores['temporal_urgency_score'] = 0.1
@@ -394,25 +410,16 @@ def make_routing_decision(scores: Dict[str, float]) -> str:
     print(f"  > Final Path Decided: '{path}'")
     return path
 
-async def get_intelligent_path(prompt: str) -> str:
-    """
-    The main orchestrator for the intelligent classification pipeline.
-    This function runs the complete 3-stage analysis.
-    """
+async def get_intelligent_path(prompt: str, context_package: Dict[str, Any]) -> str:
+    """(CORRECTED) The main orchestrator for the classification pipeline."""
     print("🚀 STARTING INTELLIGENT CLASSIFICATION PIPELINE 🚀")
-    # Stage 1: Fast, rule-based metadata extraction
     context_metadata = extract_contextual_metadata(prompt)
     
-    # Stage 2: NLP processing, LLM classification, and scoring
-    # Run the synchronous Stage 2 function in a separate thread to avoid blocking.
     loop = asyncio.get_running_loop()
-    # The LLM call inside generate_nlp_features_and_scores is blocking,
-    # so we use run_in_executor to not freeze our async server.
     scores = await loop.run_in_executor(
-        None, generate_nlp_features_and_scores, prompt, context_metadata
+        None, generate_nlp_features_and_scores, prompt, context_metadata, context_package
     )
     
-    # Stage 3: Deterministic, weighted decision making
     final_path = make_routing_decision(scores)
     print(f"🏁 INTELLIGENT PIPELINE FINISHED. Final Path: {final_path} 🏁")
     
@@ -422,13 +429,14 @@ async def get_intelligent_path(prompt: str) -> str:
 
 
 # stage 2
-def generate_search_queries(prompt: str) -> List[str]:
+def generate_search_queries(prompt: str, context_package: Dict[str, Any]) -> List[str]:
     """
     Takes a user's natural language prompt and uses the Gemini API
     to generate a list of targeted search queries.
     """
+    conversation_history = _format_context_for_prompt(context_package)
+
     try:
-        #  Define the Generation Configuration
         generation_config = {
             "temperature": 0.2,
             "top_p": 1,
@@ -436,48 +444,40 @@ def generate_search_queries(prompt: str) -> List[str]:
             "max_output_tokens": 2048,
             "response_mime_type": "application/json",
         }
-
-        #  Select the Model (Use the correct, stable model name) 
         model = genai.GenerativeModel(
             model_name="gemini-2.5-flash", 
             generation_config=generation_config,
         )
 
-        #  Craft the Prompt
-        system_prompt = """
-        You are an expert search query generation assistant. Your sole purpose is to
-        analyze the user's question and decompose it into 3 to 5 simple, effective
-        search engine queries that will gather the necessary information to provide a
-        comprehensive answer.
+        system_prompt = f"""
+You are an expert search query generation assistant. Your goal is to decompose the user's question into 3 to 5 simple, effective search queries.
 
-        Do not answer the question yourself. Do not add any commentary or explanation.
+**CRITICAL INSTRUCTION:** Analyze the provided conversation history. DO NOT generate queries for topics that have already been clearly answered or discussed. Focus your queries ONLY on the new information required by the user's latest question.
 
-        You must respond with ONLY a valid JSON object. The JSON object must have a
-        single key named "queries", which contains a list of the generated search
-        query strings.
-        """
-        full_prompt = [system_prompt, "user: ", prompt]
+---
+**CONVERSATION HISTORY:**
+{conversation_history}
+---
+**USER'S CURRENT QUESTION:**
+{prompt}
+---
 
-        #  Execute the API Call 
-        print(f"✅ [SERVICES] Sending prompt to Gemini: '{prompt}'")
-        response = model.generate_content(full_prompt)
-
-        #  Parse and Validate the Response 
+You must respond with ONLY a valid JSON object with a single key "queries", containing a list of strings. Do not answer the question or add commentary.
+"""
+        
+        print(f"✅ [SERVICES] Sending prompt to Gemini for query generation: '{prompt}'")
+        response = model.generate_content(system_prompt)
         response_json = json.loads(response.text)
         
         if "queries" not in response_json or not isinstance(response_json["queries"], list):
-            raise GeminiError("Invalid JSON response format from Gemini: 'queries' key is missing or not a list.")
+            raise GeminiError("Invalid JSON: 'queries' key is missing or not a list.")
             
         queries = response_json["queries"]
-        
-        if not all(isinstance(q, str) for q in queries):
-            raise GeminiError("Invalid JSON response format from Gemini: not all items in 'queries' are strings.")
-
-        print(f"✅ [SERVICES] Successfully received and parsed queries from Gemini: {queries}")
+        print(f"✅ [SERVICES] Successfully received context-aware queries: {queries}")
         return queries
 
     except Exception as e:
-        print(f"🚨 [SERVICES] An error occurred while calling the Gemini API: {e}")
+        print(f"🚨 [SERVICES] An error occurred while generating search queries: {e}")
         raise GeminiError(f"Failed to generate search queries: {e}")
 
 
@@ -620,52 +620,39 @@ async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
     return scraped_data
 
 # thesys implementation 
-async def generate_ui_spec_from_markdown(markdown_content: str) -> str:
-    """
-    The primary bridge to Thesys. It takes our final, generated Markdown,
-    wraps it in a carefully crafted "meta-prompt," and returns the raw,
-    untouched C1 DSL string from the Thesys API.
-
-    Args:
-        markdown_content: The complete, final Markdown answer from our RAG pipeline.
-
-    Returns:
-        The raw C1 DSL string, or an error message string if the call fails.
-    """
+async def generate_ui_spec_from_markdown(markdown_content: str, context_package: Dict[str, Any]) -> str:
+    """(UPDATED FOR CONTEXT) The primary bridge to Thesys."""
     print("✅ [THESYS] Starting conversion of Markdown to UI Spec...")
+    
+    conversation_history = _format_context_for_prompt(context_package)
 
-    # This meta-prompt is the key. It tells the c1-latest model *how* to act.
     thesys_meta_prompt = f"""
-You are an expert UI/UX designer and frontend developer. You will be given a complete, well-structured document written in Markdown that contains the answer to a user's question.
+You are an expert UI/UX designer. You will be given a Markdown document and the preceding conversation history. Your sole task is to transform the Markdown content into the best possible rich, interactive UI.
 
-Your sole task is to analyze the content and structure of this Markdown document and transform it into the best possible rich, interactive, and visually appealing UI using your component library.
-
-Follow these guidelines:
-- If you see tables, use a proper table component.
-- If you see lists of statistics, percentages, or comparisons, consider using a pie chart, bar chart, or a stats card component.
-- If you see headings, paragraphs, and lists, use appropriate card, title, text, and list components to structure the information logically.
-- The goal is to present the information in the most clear, effective, and engaging way possible. Do not simply put all the text in a single block.
-
-Here is the Markdown content you need to transform:
+Use the conversation history to inform your design. For example, if this is a follow-up question, the UI can be structured as a continuation of the previous topic.
 
 ---
+**CONVERSATION HISTORY (for context):**
+{conversation_history}
+---
+**MARKDOWN CONTENT TO TRANSFORM:**
 {markdown_content}
 ---
 """
     try:
         raw_dsl_string, status_code = await call_thesys_chat_api(thesys_meta_prompt)
 
-        if status_code == 200:
-            print("✅ [THESYS] Successfully received raw C1 DSL string. Passing through unmodified.")
-            # Return the raw string EXACTLY as it was received. NO CLEANING.
+        if 200 <= status_code < 300:
+            print("✅ [THESYS] Successfully received raw C1 DSL string.")
             return raw_dsl_string
         else:
             print(f"🚨 [THESYS] Failed to generate UI Spec. Status: {status_code}")
+            # Return an error string that the orchestrator can detect
             return "Error: The UI generation service failed to respond correctly."
 
     except Exception as e:
         print(f"🚨 [THESYS] A critical error occurred during UI generation: {e}")
-        return f"An error occurred during UI generation: {str(e)}"
+        return f"Error: An error occurred during UI generation: {str(e)}"
 
 # In services.py, replace the existing call_thesys_chat_api function
 
@@ -737,29 +724,29 @@ async def call_thesys_chat_api(prompt: str):
         return json.dumps({"error": "Unexpected server error.", "details": str(e)}), 500#stage 5
 
 async def _synthesize_answer_from_context(
-    prompt: str, scraped_data: List[Dict[str, str]]
+    prompt: str, scraped_data: List[Dict[str, str]], context_package: Dict[str, Any]
 ) -> AsyncGenerator[str, None]:
-    """
-    (Helper for the Orchestrator)
-    The final RAG synthesis step. Takes the scraped context and generates the
-    final cited answer, streaming the tokens.
-    """
-    # 1. Format the context for the LLM
+    """(UPDATED FOR CONTEXT) Final RAG synthesis step."""
+    
     formatted_context = ""
     for i, item in enumerate(scraped_data, 1):
         formatted_context += f"[Source {i}: {item['source']}]\n{item['content']}\n\n"
 
-    # 2. Craft the "Mega-Prompt"
-    system_prompt = """
-    You are a world-class AI research assistant. Your purpose is to answer the user's question with a comprehensive, well-structured, and factual response.
+    conversation_history = _format_context_for_prompt(context_package)
 
-    Follow these instructions precisely:
-    1.  **Analyze the User's Question:** Understand the core intent of the user's prompt.
-    2.  **Synthesize from Sources:** Base your answer **exclusively** on the information provided in the numbered sources. Do not use any outside knowledge.
-    3.  **Cite Everything:** You MUST cite every piece of information. Add a citation marker, like [1], [2], etc., at the end of each sentence or claim that is supported by a source. The number must correspond to the source number provided. You can use multiple citations for a single sentence, like [1][2].
-    4.  **Format Beautifully:** Structure your answer using Markdown for clarity. Use headers, bullet points, and bold text to create a readable and organized response.
-    5.  **Handle Insufficient Information:** If the provided sources do not contain enough information to answer the question, you must explicitly state: "I could not find enough information in the provided sources to answer this question." Do not try to make up an answer.
-    """
+    system_prompt = f"""
+You are a world-class AI research assistant. Your purpose is to answer the user's question with a comprehensive, well-structured, and factual response based ONLY on the provided sources.
+
+**Conversation History (for context):**
+{conversation_history}
+
+**Instructions:**
+1.  **Synthesize from Sources:** Base your answer **exclusively** on the information in the numbered sources below.
+2.  **Cite Everything:** Add a citation marker, like [1], [2], at the end of each sentence or claim.
+3.  **Be Conversational:** Use the conversation history to make your answer feel natural. You can refer to previously discussed topics (e.g., "Building on our earlier discussion...").
+4.  **Format Beautifully:** Use Markdown (headers, lists, bold text).
+5.  **Handle Insufficient Information:** If the sources don't contain the answer, state that clearly.
+"""
     full_prompt = [
         system_prompt,
         "--- CONTEXT: SOURCES ---",
@@ -783,81 +770,81 @@ async def _synthesize_answer_from_context(
 # services.py
 
 async def generate_and_stream_answer(
-    prompt: str, path: str
+    prompt: str, path: str, session_id: str, turn_number: int, context_package: Dict[str, Any]
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     The main orchestrator. Handles both Search/RAG and Direct Answer paths,
     and uses Thesys to generate a final UI spec.
     """
+    sources_for_log = []
+
     try:
         full_markdown_response = ""
         
-        # --- PATH 1: Direct Answer ---
         if path == "direct_answer":
             print("✅ [ORCHESTRATOR] Executing Direct Answer path.")
             yield {"event": "steps", "data": {"message": "Generating answer..."}}
-
+            conversation_history = _format_context_for_prompt(context_package)
+            direct_prompt = f"Conversation History:\n{conversation_history}\n\nUser's Question: {prompt}"
             model = genai.GenerativeModel(model_name="gemini-2.5-flash")
-            response_stream = model.generate_content(prompt, stream=True)
-            
-            # Correctly accumulate the response text
+            response_stream = model.generate_content(direct_prompt, stream=True)
             for chunk in response_stream:
                 if chunk.text:
-                    full_markdown_response += chunk.text # <-- IMPORTANT FIX: was adding the object, now adds the text
-        
-        # --- PATH 2: Full RAG Pipeline ---
+                    full_markdown_response += chunk.text
         else: # path == "search_required"
             print("✅ [ORCHESTRATOR] Executing Search/RAG path.")
             yield {"event": "steps", "data": {"message": "Generating search queries..."}}
-            queries = generate_search_queries(prompt)
-            # We don't need to yield queries to the new frontend
-            
+            # --- FIX: Pass context_package to the query generator ---
+            queries = generate_search_queries(prompt, context_package)
+            # --- END OF FIX ---
             yield {"event": "steps", "data": {"message": "Searching the web..."}}
             urls = await get_urls_from_queries(queries)
-            
             yield {"event": "steps", "data": {"message": f"Reviewing {len(urls)} sources..."}}
             scraped_data = await scrape_urls_in_parallel(urls)
-
-            MIN_SOURCES_REQUIRED = 2 # Lowered slightly for more reliability
+            MIN_SOURCES_REQUIRED = 2
             if not scraped_data or len(scraped_data) < MIN_SOURCES_REQUIRED:
-                yield {"event": "error", "data": {"message": f"Could only retrieve content from {len(scraped_data)} out of {len(urls)} sources, which is not enough to provide a reliable answer."}}
+                yield {"event": "error", "data": {"message": f"Could only retrieve content from {len(scraped_data)} sources."}}
                 return
-
-            # Prepare sources for the frontend if needed later, but the main UI will be from Thesys
-            sources = [{"title": url.split('/')[2].replace('www.', ''), "url": url} for url in urls]
-            yield {"event": "sources", "data": {"sources": sources}}
-
+            sources_for_log = [{"title": url.split('/')[2].replace('www.', ''), "url": url} for url in urls]
+            yield {"event": "sources", "data": {"sources": sources_for_log}}
             yield {"event": "steps", "data": {"message": "Synthesizing the final answer..."}}
-            
-            # Accumulate the full response instead of streaming tokens
-            async for chunk in _synthesize_answer_from_context(prompt, scraped_data):
+            async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
                 full_markdown_response += chunk
 
-        # --- FINAL THESYS INTEGRATION STEP (RUNS FOR BOTH PATHS) ---
         if full_markdown_response.strip():
             yield {"event": "steps", "data": {"message": "Generating interactive UI..."}}
-            
-            # Call our new bridge function to get the final RAW DSL STRING
-            raw_dsl_string = await generate_ui_spec_from_markdown(full_markdown_response)
-            
-            # Yield the final UI DSL string with a new event name.
-            # The data is the raw string itself.
+            raw_dsl_string = await generate_ui_spec_from_markdown(full_markdown_response, context_package)
             yield {"event": "aui_dsl", "data": raw_dsl_string}
+
+            summary, entities = await asyncio.gather(
+                _generate_summary(full_markdown_response),
+                _extract_entities(full_markdown_response)
+            )
+
+            metadata_payload = {"summary": summary, "entities": entities}
+            yield {"event": "turn_metadata", "data": metadata_payload}
+            
+            log_data = {
+                "session_id": session_id,
+                "turn_number": turn_number,
+                "user_query": prompt,
+                "response_summary": summary,
+                "entities_mentioned": entities,
+                "sources_used": sources_for_log,
+                "execution_path": path,
+                "created_at": datetime.now(timezone.utc)
+            }
+            asyncio.create_task(_log_turn_to_db(log_data))
         else:
             yield {"event": "error", "data": {"message": "Failed to generate a response."}}
 
     except Exception as e:
-        print(f"🚨 [ORCHESTRATOR] A critical error occurred: {e}")
         import traceback
-        traceback.print_exc() # Print full traceback for better debugging
-        yield {
-            "event": "error",
-            "data": {"message": f"An unexpected error occurred: {str(e)}"}
-        }
+        traceback.print_exc()
+        yield {"event": "error", "data": {"message": f"An unexpected error occurred: {str(e)}"}}
     
     finally:
         print("✅ [ORCHESTRATOR] Stream finished.")
-        # The 'finished' event can still be useful for the frontend to know the process is complete
         yield {"event": "finished", "data": {"message": "Stream completed."}}
 
 
@@ -890,3 +877,77 @@ async def stream_sse_formatter(
         sse_message += "\n"
         
         yield sse_message
+
+
+# backend/api/services.py
+
+# ... after the _format_context_for_prompt function
+
+# --- NEW: Helper functions for Phase 3 ---
+
+async def _generate_summary(markdown_content: str) -> str:
+    """Uses a fast LLM to generate a one-sentence summary of the response."""
+    print("  > [METADATA] Generating response summary...")
+    try:
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        prompt = f"""
+        Analyze the following text, which is an AI-generated answer to a user's query.
+        Your task is to create a very concise, one-sentence summary of the answer's main point.
+        This summary will be used as conversational memory. Do not include any preamble.
+        
+        TEXT TO SUMMARIZE:
+        ---
+        {markdown_content}
+        ---
+        """
+        response = await model.generate_content_async(prompt)
+        summary = response.text.strip().replace('\n', ' ')
+        print(f"    - Summary created: \"{summary}\"")
+        return summary
+    except Exception as e:
+        print(f"    - 🚨 Error generating summary: {e}")
+        return "A response was generated." # Return a generic fallback
+
+async def _extract_entities(markdown_content: str) -> List[str]:
+    """Uses a fast LLM to extract key entities from the response."""
+    print("  > [METADATA] Extracting key entities...")
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            generation_config={"response_mime_type": "application/json"}
+        )
+        prompt = f"""
+        Analyze the following text. Identify and extract the 3-5 most important proper nouns,
+        concepts, or key terms. These entities will be used for contextual memory.
+        
+        You MUST respond with ONLY a valid JSON object with a single key "entities",
+        which contains a list of the extracted entity strings.
+        
+        TEXT TO ANALYZE:
+        ---
+        {markdown_content}
+        ---
+        """
+        response = await model.generate_content_async(prompt)
+        result = json.loads(response.text)
+        entities = result.get("entities", [])
+        print(f"    - Entities extracted: {entities}")
+        return entities
+    except Exception as e:
+        print(f"    - 🚨 Error extracting entities: {e}")
+        return [] # Return an empty list on failure
+# --- END OF NEW HELPERS ---
+
+async def _log_turn_to_db(log_data: Dict[str, Any]):
+    """(CORRECTED) Logs a single conversational turn to MongoDB with a safe check."""
+    # --- FIX: Compare with None instead of using a truthiness test ---
+    if conversations_collection is None:
+        print("🚨 [DB_LOG] Cannot log turn: conversations_collection is not available.")
+        return
+    # --- END OF FIX ---
+    
+    try:
+        await conversations_collection.insert_one(log_data)
+        print(f"✅ [DB_LOG] Successfully logged turn {log_data['turn_number']} for session {log_data['session_id']}")
+    except Exception as e:
+        print(f"🚨 [DB_LOG] Failed to log turn to MongoDB: {e}")

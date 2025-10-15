@@ -9,15 +9,16 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings-0",
     "preview": "vite preview"
   },
-"dependencies": {
-  "@crayonai/react-core": "^0.7.6",
-  "@crayonai/react-ui": "^0.8.31",
-  "@thesysai/genui-sdk": "^0.6.34",
-  "react": "^18.2.0",
-  "react-dom": "^18.2.0",
-  "react-icons": "^5.2.1",
-  "react-markdown": "^9.0.1"
-},
+  "dependencies": {
+    "@crayonai/react-core": "^0.7.6",
+    "@crayonai/react-ui": "^0.8.31",
+    "@thesysai/genui-sdk": "^0.6.34",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^5.2.1",
+    "react-markdown": "^9.0.1",
+    "uuid": "^13.0.0"
+  },
   "devDependencies": {
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",

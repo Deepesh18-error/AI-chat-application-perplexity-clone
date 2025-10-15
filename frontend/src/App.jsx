@@ -5,11 +5,13 @@ import { ThemeProvider } from '@thesysai/genui-sdk';
 import ResponseContainer from './components/ResponseContainer';
 import WelcomeScreen from './components/WelcomeScreen';
 import './index.css';
+import { v4 as uuidv4 } from 'uuid';
 
 function App() {
   const [prompt, setPrompt] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,15 +22,39 @@ function App() {
     const currentPrompt = prompt;
     setPrompt('');
 
-    const newResponseState = {
-      key: Date.now(),
-      prompt: currentPrompt,
-      steps: [],
-      sources: [],
-      auiSpec: null,
-      error: null,
-      isLoading: true,
-    };
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      const newSessionId = uuidv4();
+      setSessionId(newSessionId);
+      currentSessionId = newSessionId;
+      console.log(`  [SESSION] New session started with ID: ${newSessionId}`);
+    } else {
+      console.log(`  [SESSION] Continuing session with ID: ${currentSessionId}`);
+    }
+
+  const context_package = {
+    current_query: currentPrompt,
+    previous_turns: chatHistory
+      .map(turn => ({
+        query: turn.prompt,
+        summary: turn.summary,
+        entities: turn.entities,
+      })),
+  };
+    console.log("  [CONTEXT] Assembled context package:", context_package);
+
+
+  const newResponseState = {
+    key: Date.now(),
+    prompt: currentPrompt,
+    steps: [],
+    sources: [],
+    auiSpec: null,
+    error: null,
+    isLoading: true,
+    summary: null,
+    entities: [],
+  };
     setChatHistory(prev => [...prev, newResponseState]);
     console.log("  [STATE] Initial response object added to chat history.");
 
@@ -36,7 +62,13 @@ function App() {
       const response = await fetch(import.meta.env.VITE_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: currentPrompt }),
+        body: JSON.stringify({
+          prompt: currentPrompt,
+          session_id: currentSessionId,
+          turn_number: chatHistory.length + 1, // The new turn number
+          context_package: context_package,
+        }),
+
       });
       console.log("  [NETWORK] Initial response received from backend. Status:", response.status);
 
@@ -109,6 +141,26 @@ function App() {
                   updatedState.auiSpec = reconstructedData;
                   break;
                 }
+                
+                 case 'turn_metadata': {
+                  try {
+                      const metadata = JSON.parse(reconstructedData);
+                      updatedState.summary = metadata.summary;
+                      updatedState.entities = metadata.entities;
+                      console.log("  [STATE] Received and stored turn metadata. Turn complete.", metadata);
+
+                      // --- CRITICAL FIX ---
+                      // Since metadata is the TRUE final step, we now unlock the main UI here.
+                      setIsLoading(false); 
+                      console.log("  [STATE] UI unlocked after receiving metadata.");
+                      // --- END OF FIX ---
+
+                    } catch (e) {
+                      console.error("  [STATE] Failed to parse turn_metadata JSON:", e, reconstructedData);
+                      setIsLoading(false); // Also unlock on error
+                    }
+                    break;
+                  }
 
                 case 'finished':
                   break;
@@ -127,16 +179,10 @@ function App() {
       await processStream();
     } catch (error) {
       console.error('❌ [FETCH ERROR] An error occurred during the fetch process:', error);
-      setChatHistory(prev => prev.map((chat, index) => {
-        if (index !== prev.length - 1) return chat;
-        return { ...chat, error: error.message };
-      }));
-    } finally {
+      setChatHistory(prev => prev.map((chat, i) => i === prev.length - 1 ? { ...chat, error: error.message, isLoading: false } : chat));
       setIsLoading(false);
-      setChatHistory(prev => prev.map((chat, index) => {
-        if (index !== prev.length - 1) return chat;
-        return { ...chat, isLoading: false };
-      }));
+    } finally {
+      
       console.log("[FINALLY] isLoading set to false, UI unlocked.");
       console.groupEnd();
     }
