@@ -13,6 +13,7 @@
   --text-muted: #888;
 }
 
+
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
@@ -22,21 +23,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  width: 100%;
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 20px;
-  box-sizing: border-box;
-}
 
-.response-area {
+.chat-area {
   flex-grow: 1;
   overflow-y: auto;
-  padding-bottom: 20px;
+  padding: 20px; /* Simplified padding */
+  box-sizing: border-box;
 }
 
 /* Welcome Screen */
@@ -47,7 +39,11 @@ body {
 .example-prompts button:hover { background-color: #333; }
 
 /* Prompt Form */
-.prompt-form { display: flex; padding-top: 20px; border-top: 1px solid var(--border-color); }
+.prompt-form { 
+  display: flex; 
+  padding-top: 0;      /* CHANGED */
+  border-top: none;    /* CHANGED */
+}
 .prompt-form input { flex-grow: 1; background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 14px; border-radius: 8px; font-size: 16px; }
 .prompt-form input:focus { outline: none; border-color: var(--primary-color); }
 .prompt-form button { background-color: var(--primary-color); color: white; border: none; padding: 14px 22px; border-radius: 8px; margin-left: 10px; cursor: pointer; font-size: 16px; transition: background-color 0.2s; font-weight: 500; }
@@ -158,4 +154,265 @@ body {
   outline: 4px solid rgba(255, 255, 255, 0.7); /* Optional: add a highlight border */
   outline-offset: -4px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+/* --- NEW APPLICATION LAYOUT --- */
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--background-color);
+}
+
+.sidebar {
+  width: 280px;
+  background-color: #1a1a1a;
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+  /* ADD THIS LINE to animate changes smoothly */
+  transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
+  overflow-x: hidden; /* Prevents content from spilling out during animation */
+}
+
+.main-content {
+  flex-grow: 1; /* Takes up all remaining horizontal space */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 820px;
+  margin: 0 auto; /* Centers the main content area */
+  width: 100%;
+}
+
+.chat-area {
+  flex-grow: 1; /* Takes up all available vertical space in the main-content area */
+  overflow-y: auto; /* This is the key that enables INDEPENDENT SCROLLING */
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* This is the new wrapper for the prompt form at the bottom */
+.prompt-section {
+  padding: 20px;
+  padding-top: 15px; /* A little less padding on top */
+  border-top: 1px solid var(--border-color);
+  background-color: var(--background-color); /* Ensures it's not transparent on scroll */
+}
+
+/* --- COLLAPSIBLE SIDEBAR STYLES --- */
+
+/* Style for when the sidebar is OPEN (its default state) */
+.sidebar.open {
+  width: 280px;
+  transform: translateX(0);
+  border-right: 1px solid var(--border-color);
+}
+
+/* Style for when the sidebar is CLOSED */
+.sidebar.closed {
+  width: 0;
+  transform: translateX(-100%);
+  border-right: none; /* Hide border when closed */
+}
+
+/* --- SIDEBAR TOGGLE BUTTON --- */
+
+
+/* --- NEW CHAT BUTTON --- */
+.new-chat-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  width: 100%;
+  padding: 12px 15px;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 15px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  margin-bottom: 20px;
+}
+
+.new-chat-btn:hover {
+  background-color: var(--container-bg);
+}
+
+.new-chat-icon {
+  display: flex;
+  align-items: center;
+  color: #a0a0a0; /* A slightly muted color for the icons */
+}
+
+.hamburger-icon {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.plus-icon {
+  font-size: 16px;
+  font-weight: bold;
+  color: #8b5cf6; /* A purple/accent color for the plus */
+  margin-left: -4px; /* Nudge the plus icon closer to the hamburger */
+}
+
+/* --- SIDEBAR TOGGLE BUTTON (CORRECTED) --- */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 15px;
+  
+  /* Start position when sidebar is closed */
+  left: 15px; 
+
+  z-index: 1000;
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 24px;
+  line-height: 1;
+  
+  /* Animate BOTH color and left position */
+  transition: color 0.2s, left 0.3s ease-in-out;
+}
+
+.sidebar-toggle-btn:hover {
+  color: var(--text-color);
+}
+
+.main-content.sidebar-is-open .sidebar-toggle-btn {
+  /* Move the button to the right by the width of the sidebar + padding */
+  left: calc(280px + 15px);
+}
+
+/* --- ENHANCED STEPS TIMELINE STYLES --- */
+
+/* Base styles for all step items for consistent spacing */
+.steps-timeline .step-item {
+  position: relative;
+  padding-left: 30px; /* Increased padding for alignment */
+  margin-bottom: 15px;
+  display: flex; /* Use flex for alignment */
+  align-items: center; /* Center icon and text vertically */
+  min-height: 24px; /* Ensure consistent height */
+}
+
+/* Modify the ::before pseudo-element for better alignment */
+.steps-timeline .step-item::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 50%; /* Center vertically */
+  transform: translateY(-50%); /* Precise vertical centering */
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* Style for the special search query steps */
+.steps-timeline .search-query {
+  background-color: rgba(255, 255, 255, 0.03); /* Subtle background highlight */
+  border-radius: 6px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--primary-color);
+  margin-left: 10px; /* Indent the search queries */
+  padding-left: 12px; /* Override the base padding-left */
+}
+
+/* Search queries don't need the checkmark/dot from the base .step-item */
+.steps-timeline .search-query::before {
+  display: none;
+}
+
+.query-icon {
+  margin-right: 10px;
+  font-size: 16px;
+  color: var(--primary-color);
+}
+
+.query-text {
+  font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* --- CHAT HISTORY LIST STYLES --- */
+
+.chat-history-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-y: auto; /* Allow history to scroll if it's long */
+  flex-grow: 1; /* Take up remaining space in sidebar */
+}
+
+.history-title {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 0 10px 10px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+}
+
+.chat-history-item {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  width: 100%;  
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: var(--text-color);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.2s ease;
+}
+
+.chat-history-item:hover {
+  background-color: var(--container-bg);
+}
+
+.chat-history-item.active {
+  background-color: var(--primary-color);
+  color: white;
+  font-weight: 500;
+}
+
+.no-history-text {
+  font-size: 14px;
+  color: var(--text-muted);
+  padding: 0 10px;
+}
+
+.history-notice-banner {
+  background-color: rgba(59, 130, 246, 0.1); /* Subtle blue background */
+  color: #a5b4fc; /* Light blue/purple text */
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 8px;
+  padding: 10px 15px;
+  margin-bottom: 20px; /* Space before the tabs */
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* --- SIDEBAR ERROR TEXT --- */
+.sidebar-error-text {
+  font-size: 14px;
+  color: #ff8b8b; /* A noticeable but not jarring red */
+  padding: 10px;
+  text-align: center;
+  background-color: rgba(255, 107, 107, 0.1);
+  border-radius: 6px;
 }

@@ -1,9 +1,10 @@
-// src/App.jsx - ENHANCED LOGGING
+// src/App.jsx - RESTRUCTURED FOR NEW LAYOUT
 
 import { useState } from 'react';
 import { ThemeProvider } from '@thesysai/genui-sdk';
 import ResponseContainer from './components/ResponseContainer';
 import WelcomeScreen from './components/WelcomeScreen';
+import Sidebar from './components/Sidebar'; // <-- STEP 1: Import the new component
 import './index.css';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,11 +13,58 @@ function App() {
   const [chatHistory, setChatHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+
+   const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
+
+    const handleNewChat = () => {
+    // Reset the chat history to an empty array
+    setChatHistory([]);
+    // Clear the session ID so a new one is generated on the next message
+    setSessionId(null);
+    // A nice UX touch: close the sidebar after starting a new chat
+    setIsSidebarOpen(false);
+  };
+
+     const handleLoadSession = async (sessionId) => {
+    if (!sessionId || sessionId === currentSessionId) {
+       setIsSidebarOpen(false);
+      return;
+    }
+    console.log(`[SESSION] Loading session: ${sessionId}`);
+    setIsLoading(true);
+    setChatHistory([]);
+    setIsSidebarOpen(false);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}sessions/${sessionId}/`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch session history: ${response.statusText}`);
+      }
+      const data = await response.json();
+      setChatHistory(data);
+      setSessionId(sessionId);
+      console.log(`[SESSION] Successfully loaded ${data.length} turns.`);
+    } catch (error) {
+      console.error("Error loading session:", error);
+      setChatHistory([]);
+      setSessionId(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim() || isLoading) return;
 
+    // ... (Your entire handleSubmit logic remains UNCHANGED)
+    // No need to copy it here, it stays exactly the same.
     console.group(`🚀 [SUBMIT] New Request Started: "${prompt}"`);
     setIsLoading(true);
     const currentPrompt = prompt;
@@ -60,7 +108,7 @@ function App() {
     console.log("  [STATE] Initial response object added to chat history.");
 
     try {
-      const response = await fetch(import.meta.env.VITE_API_URL, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}generate/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -200,35 +248,50 @@ function App() {
     }
   };
 
+
   const handleExampleClick = (examplePrompt) => {
     setPrompt(examplePrompt);
   };
 
   return (
     <ThemeProvider>
-      <div className="app-container">
-        <div className="response-area">
-          {chatHistory.length === 0 ? (
-            <WelcomeScreen onExampleClick={handleExampleClick} />
-          ) : (
-            chatHistory.map((chat) => (
-              <ResponseContainer key={chat.key} response={chat} />
-            ))
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} className="prompt-form">
-          <input
-            type="text"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ask me anything..."
-            disabled={isLoading}
-          />
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? '...' : 'Ask'}
+      {/* STEP 2: The entire structure is replaced with the new layout */}
+      <div className="app-layout">
+        <Sidebar 
+          isOpen={isSidebarOpen} 
+          onNewChat={handleNewChat}  // <-- ADD THIS PROP
+          onSessionSelect={handleLoadSession} // Pass the loading function
+          currentSessionId={sessionId}        // Pass the current session ID for highlighting
+        />
+        <div className={`main-content ${isSidebarOpen ? 'sidebar-is-open' : ''}`}>
+          <button onClick={toggleSidebar} className="sidebar-toggle-btn">
+            ☰
           </button>
-        </form>
+          <div className="chat-area"> {/* Renamed from response-area */}
+            {chatHistory.length === 0 ? (
+              <WelcomeScreen onExampleClick={handleExampleClick} />
+            ) : (
+              chatHistory.map((chat) => (
+                <ResponseContainer key={chat.key} response={chat} />
+              ))
+            )}
+          </div>
+
+          <div className="prompt-section"> {/* Wrapper div for form */}
+            <form onSubmit={handleSubmit} className="prompt-form">
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Ask me anything..."
+                disabled={isLoading}
+              />
+              <button type="submit" disabled={isLoading}>
+                {isLoading ? '...' : 'Ask'}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </ThemeProvider>
   );

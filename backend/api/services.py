@@ -846,7 +846,9 @@ async def generate_and_stream_answer(
                 return
 
             # Update the step message to reflect the parallel search
-            yield {"event": "steps", "data": {"message": "Searching for text and images..."}}
+            # yield {"event": "steps", "data": {"message": "Searching for text and images..."}}
+            for query in queries:
+                yield {"event": "steps", "data": {"message": f"Searching for: \"{query}\""}}
 
             # --- STEP 2: EXECUTE CONCURRENTLY WITH ASYNCIO.GATHER ---
             # We select the first, most general query for the image search.
@@ -899,25 +901,79 @@ async def generate_and_stream_answer(
             raw_dsl_string = await generate_ui_spec_from_markdown(full_markdown_response, context_package)
             yield {"event": "aui_dsl", "data": raw_dsl_string}
 
-            summary, entities = await asyncio.gather(
-                _generate_summary(full_markdown_response),
-                _extract_entities(full_markdown_response)
-            )
+            # --- START OF DEFINITIVE FIX ---
 
-            metadata_payload = {"summary": summary, "entities": entities}
-            yield {"event": "turn_metadata", "data": metadata_payload}
-            
-            log_data = {
-                "session_id": session_id,
-                "turn_number": turn_number,
-                "user_query": prompt,
-                "response_summary": summary,
-                "entities_mentioned": entities,
-                "sources_used": sources_for_log,
-                "execution_path": path,
-                "created_at": datetime.now(timezone.utc)
-            }
-            asyncio.create_task(_log_turn_to_db(log_data))
+            print("✅ [ORCHESTRATOR] Starting final metadata generation.")
+            log_data = {}
+
+            if turn_number == 1:
+                print("  > Turn 1 detected. Generating DEDICATED title and summary.")
+                # For the first turn, we generate everything: a title, a summary, and entities.
+                title, summary, entities = await asyncio.gather(
+                    _generate_chat_title(prompt),
+                    _generate_summary(full_markdown_response),
+                    _extract_entities(full_markdown_response)
+                )
+                
+                # --- CRITICAL DEBUGGING LOG ---
+                print(f"    - Generated Title (for DB): '{title}'")
+                print(f"    - Generated Summary (for context): '{summary}'")
+                print(f"    - Generated Entities (for context): {entities}")
+                # --- END OF DEBUGGING LOG ---
+
+                # This is what the frontend needs for this turn
+                metadata_payload = {"summary": summary, "entities": entities}
+                yield {"event": "turn_metadata", "data": metadata_payload}
+                
+                # This is what gets saved to the database for this turn
+                log_data = {
+                    "session_id": session_id,
+                    "turn_number": turn_number,
+                    "user_query": prompt,
+                    "chat_title": title, # The new, permanent title for the session
+                    "response_summary": summary, # The summary for this specific turn's context
+                    "entities_mentioned": entities,
+                    "sources_used": sources_for_log,
+                    "execution_path": path,
+                    "created_at": datetime.now(timezone.utc)
+                }
+            else: # For turn_number > 1
+                print(f"  > Turn {turn_number} detected. Generating summary for context only.")
+                # For subsequent turns, we ONLY need a summary and entities for context.
+                summary, entities = await asyncio.gather(
+                    _generate_summary(full_markdown_response),
+                    _extract_entities(full_markdown_response)
+                )
+
+                # --- CRITICAL DEBUGGING LOG ---
+                print(f"    - Generated Summary (for context): '{summary}'")
+                print(f"    - Generated Entities (for context): {entities}")
+                # --- END OF DEBUGGING LOG ---
+
+                metadata_payload = {"summary": summary, "entities": entities}
+                yield {"event": "turn_metadata", "data": metadata_payload}
+                
+                log_data = {
+                    "session_id": session_id,
+                    "turn_number": turn_number,
+                    "user_query": prompt,
+                    # NO chat_title field for subsequent turns
+                    "response_summary": summary,
+                    "entities_mentioned": entities,
+                    "sources_used": sources_for_log,
+                    "execution_path": path,
+                    "created_at": datetime.now(timezone.utc)
+                }
+
+            # --- DEBUG LOG BEFORE DB WRITE ---
+            print("  > Data prepared for database logging:")
+            import pprint
+            pprint.pprint(log_data)
+            # --- END OF DEBUG LOG ---
+
+            await _log_turn_to_db(log_data)
+            # --- END OF DEFINITIVE FIX ---
+
         else:
             yield {"event": "error", "data": {"message": "Failed to generate a response."}}
 
@@ -1021,16 +1077,64 @@ async def _extract_entities(markdown_content: str) -> List[str]:
         return [] # Return an empty list on failure
 # --- END OF NEW HELPERS ---
 
-async def _log_turn_to_db(log_data: Dict[str, Any]):
-    """(CORRECTED) Logs a single conversational turn to MongoDB with a safe check."""
-    # --- FIX: Compare with None instead of using a truthiness test ---
+async def _generate_chat_title(user_query: str) -> str:
+    """
+    Uses a fast LLM to generate a concise, high-quality, user-facing title
+    for a new conversation, based on the user's first query.
+    """
+    print("  > [METADATA] Generating DEDICATED chat title for new session...")
+    try:
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        
+        prompt = f"""
+        Analyze the user's initial query. Your task is to create a concise, 3-to-6-word, user-facing title for the conversation that is about to begin. The title should accurately represent the user's primary intent.
+
+        - User Query: "explain the theory of relativity and its impact on GPS" -> Title: Theory of Relativity & GPS
+        - User Query: "write a short horror story about a foggy night on a lonely road" -> Title: Foggy Night Horror Story
+        - User Query: "give me the merge sort code in python" -> Title: Merge Sort in Python
+
+        Do NOT use quotation marks. Respond with ONLY the title.
+
+        USER'S QUERY TO ANALYZE:
+        ---
+        "{user_query}"
+        ---
+        """
+        response = await model.generate_content_async(prompt)
+        title = response.text.strip().replace('\n', ' ')
+        
+        print(f"    - Dedicated title created: \"{title}\"")
+        return title
+        
+    except Exception as e:
+        print(f"    - 🚨 Error generating dedicated title: {e}")
+        # A smart fallback is to just use the user's query itself as the title.
+        return user_query[:50]
+    
+
+async def _log_turn_to_db(log_data: dict):
+    """
+    Updates the final turn data in MongoDB.
+    Uses upsert=True for resilience: if the initial record somehow failed to be
+    created, this will create it. Otherwise, it updates the existing placeholder.
+    """
     if conversations_collection is None:
         print("🚨 [DB_LOG] Cannot log turn: conversations_collection is not available.")
         return
-    # --- END OF FIX ---
     
     try:
-        await conversations_collection.insert_one(log_data)
-        print(f"✅ [DB_LOG] Successfully logged turn {log_data['turn_number']} for session {log_data['session_id']}")
+        # Define the query to find the specific turn in the specific session
+        query_filter = {
+            "session_id": log_data["session_id"],
+            "turn_number": log_data["turn_number"]
+        }
+
+        # Define the data we want to set/update
+        update_data = {"$set": log_data}
+
+        # Perform an update_one operation with upsert=True
+        await conversations_collection.update_one(query_filter, update_data, upsert=True)
+        
+        print(f"✅ [DB_LOG] Successfully logged/updated turn {log_data['turn_number']} for session {log_data['session_id']}")
     except Exception as e:
-        print(f"🚨 [DB_LOG] Failed to log turn to MongoDB: {e}")
+        print(f"🚨 [DB_LOG] Failed to log/update turn to MongoDB: {e}")

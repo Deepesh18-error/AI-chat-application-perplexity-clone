@@ -18,6 +18,13 @@ function ResponseContainer({ response }) {
         {response.prompt}
       </p>
 
+      {response.isLoadedFromHistory && (
+        <div className="history-notice-banner">
+          ⓘ Displaying a summary from chat history. The full interactive response is not stored.
+        </div>
+      )}
+
+
       <div className="tabs">
         <button onClick={() => setActiveTab('answer')} className={activeTab === 'answer' ? 'active' : ''}>
           <BsFileText /> Answer
