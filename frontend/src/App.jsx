@@ -28,33 +28,49 @@ function App() {
     setIsSidebarOpen(false);
   };
 
-     const handleLoadSession = async (sessionId) => {
-    if (!sessionId || sessionId === currentSessionId) {
-       setIsSidebarOpen(false);
+    const handleLoadSession = async (sessionIdToLoad) => {
+    // Get the sessionId from the component's state for comparison
+    const currentSessionIdFromState = sessionId;
+
+    // --- LOGIC CHECK 1: Don't do anything if no ID is provided ---
+    if (!sessionIdToLoad) {
+      console.warn("[SESSION] handleLoadSession called with no ID. Aborting.");
       return;
     }
-    console.log(`[SESSION] Loading session: ${sessionId}`);
+
+    // --- LOGIC CHECK 2: Don't reload if the requested session is already loaded ---
+    if (sessionIdToLoad === currentSessionIdFromState) {
+      console.log(`[SESSION] Session ${sessionIdToLoad} is already active. Closing sidebar.`);
+      setIsSidebarOpen(false); // Just close the sidebar as a UX improvement
+      return;
+    }
+
+    // --- If checks pass, proceed with loading ---
+    console.log(`[SESSION] Starting to load new session: ${sessionIdToLoad}`);
     setIsLoading(true);
-    setChatHistory([]);
-    setIsSidebarOpen(false);
+    setChatHistory([]); // Clear the old chat
+    setIsSidebarOpen(false); // Close the sidebar
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}sessions/${sessionId}/`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}sessions/${sessionIdToLoad}/`);
       if (!response.ok) {
         throw new Error(`Failed to fetch session history: ${response.statusText}`);
       }
       const data = await response.json();
-      setChatHistory(data);
-      setSessionId(sessionId);
-      console.log(`[SESSION] Successfully loaded ${data.length} turns.`);
+
+      // --- CRITICAL STATE UPDATES ---
+      setChatHistory(data);         // Load the new history
+      setSessionId(sessionIdToLoad); // Set the new session as active
+      
+      console.log(`[SESSION] Successfully loaded ${data.length} turns for session ${sessionIdToLoad}.`);
     } catch (error) {
       console.error("Error loading session:", error);
-      setChatHistory([]);
-      setSessionId(null);
+      setChatHistory([]); // Clear history on error
+      setSessionId(null);   // Reset session ID on error
     } finally {
       setIsLoading(false);
     }
-  };
+};
 
 
 

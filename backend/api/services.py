@@ -933,6 +933,7 @@ async def generate_and_stream_answer(
                     "chat_title": title, # The new, permanent title for the session
                     "response_summary": summary, # The summary for this specific turn's context
                     "entities_mentioned": entities,
+                    "full_response_spec": raw_dsl_string,
                     "sources_used": sources_for_log,
                     "execution_path": path,
                     "created_at": datetime.now(timezone.utc)
@@ -960,6 +961,7 @@ async def generate_and_stream_answer(
                     # NO chat_title field for subsequent turns
                     "response_summary": summary,
                     "entities_mentioned": entities,
+                    "full_response_spec": raw_dsl_string,
                     "sources_used": sources_for_log,
                     "execution_path": path,
                     "created_at": datetime.now(timezone.utc)

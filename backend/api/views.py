@@ -135,20 +135,32 @@ async def get_session_history(request, session_id: str):
         # It formats the data for the frontend
         formatted_history = []
         for doc in history_docs:
-            # It cleverly creates a simplified UI spec from the summary for history items
-            aui_spec_from_summary = f"<C1><P>{doc.get('response_summary', 'No summary available.')}</P></C1>"
+            
+            # --- START OF MODIFICATION ---
+            
+            # Default to a simple summary-based spec
+            final_aui_spec = f"<C1><P>{doc.get('response_summary', 'No summary available.')}</P></C1>"
+            
+            # Check if the high-fidelity spec exists and has content
+            full_spec = doc.get("full_response_spec")
+            if full_spec and isinstance(full_spec, str) and full_spec.strip():
+                # If it does, use it instead of the summary
+                final_aui_spec = full_spec
+                
+            # --- END OF MODIFICATION ---
+
             formatted_history.append({
                 "key": str(doc['_id']),
                 "prompt": doc.get('user_query'),
                 "steps": ["Loaded from history"],
                 "sources": doc.get('sources_used', []),
-                "auiSpec": aui_spec_from_summary,
+                "auiSpec": final_aui_spec, # <-- USE THE FINAL SPEC
                 "error": None,
                 "isLoading": False,
                 "summary": doc.get('response_summary'),
                 "entities": doc.get('entities_mentioned', []),
                 "images": [],
-                "isLoadedFromHistory": True # This flag is a great idea
+                "isLoadedFromHistory": True
             })
         return JsonResponse(formatted_history, safe=False, encoder=ObjectIdEncoder)
     except Exception as e:

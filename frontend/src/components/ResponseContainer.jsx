@@ -17,12 +17,7 @@ function ResponseContainer({ response }) {
       <p className="response-prompt">
         {response.prompt}
       </p>
-
-      {response.isLoadedFromHistory && (
-        <div className="history-notice-banner">
-          ⓘ Displaying a summary from chat history. The full interactive response is not stored.
-        </div>
-      )}
+      
 
 
       <div className="tabs">
