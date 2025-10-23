@@ -416,3 +416,59 @@ body {
   background-color: rgba(255, 107, 107, 0.1);
   border-radius: 6px;
 }
+
+/* src/index.css - Add these new styles */
+
+/* --- DELETE BUTTON STYLES --- */
+
+.chat-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  /* This tells the browser to include padding in the element's total width */
+  box-sizing: border-box; 
+  width: 100%; /* Ensure it takes the full width of the sidebar */
+}
+
+/* This ensures the title truncates properly and doesn't push the button */
+.history-item-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1; /* Allow it to grow */
+  min-width: 0; /* A flexbox trick to allow shrinking and ellipsis */
+}
+
+/* Updated styles for the icon button */
+.delete-button {
+  background: transparent;
+  border: none;
+  color: #909090;
+  cursor: pointer;
+  padding: 6px; /* A little padding to make it easier to click */
+  border-radius: 6px;
+  flex-shrink: 0; /* Prevent the button from shrinking */
+
+  /* Center the icon perfectly inside the button */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* The magic: Hide it by default and set up a transition */
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease-in-out;
+}
+
+/* The hover effect: When hovering the PARENT, make the button visible */
+.chat-history-item:hover .delete-button {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* A nice hover effect for the button itself */
+.delete-button:hover {
+  background-color: rgba(255, 107, 107, 0.15); /* Subtle red background */
+  color: #ff8b8b; /* Red icon color */
+}

@@ -1,6 +1,6 @@
 // src/App.jsx - RESTRUCTURED FOR NEW LAYOUT
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThemeProvider } from '@thesysai/genui-sdk';
 import ResponseContainer from './components/ResponseContainer';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -15,9 +15,30 @@ function App() {
   const [sessionId, setSessionId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
 
+  const [sessions, setSessions] = useState([]);
+  const [sessionsError, setSessionsError] = useState(null);
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      setSessionsError(null); 
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}sessions/`);
+        if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
+        const data = await response.json();
+        setSessions(data);
+      } catch (error) {
+        console.error("Failed to fetch sessions:", error);
+        setSessionsError("Could not load chats."); 
+      }
+    };
+        if (isSidebarOpen) {
+        fetchSessions();
+    }
+    }, [isSidebarOpen, sessionId]);
    const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
+
 
     const handleNewChat = () => {
     // Reset the chat history to an empty array
@@ -269,15 +290,46 @@ function App() {
     setPrompt(examplePrompt);
   };
 
+  const handleDeleteSession = async (sessionIdToDelete) => {
+    console.log(`[SESSION] Attempting to delete session: ${sessionIdToDelete}`);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}sessions/${sessionIdToDelete}/`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete session. Status: ${response.status}`);
+      }
+
+      console.log(`[SESSION] Successfully deleted on backend. Updating UI.`);
+      
+      // 1. Update the sidebar list immediately for instant feedback
+      setSessions(prevSessions => prevSessions.filter(s => s.session_id !== sessionIdToDelete));
+
+      // 2. If the deleted chat is the one currently open, reset the main view
+      if (sessionIdToDelete === sessionId) {
+        console.log(`[SESSION] Active session was deleted. Resetting chat view.`);
+        setChatHistory([]);
+        setSessionId(null);
+      }
+    } catch (error) {
+      console.error("Error deleting session:", error);
+      // Optionally, set an error state to show a notification to the user
+    }
+  };
+
   return (
     <ThemeProvider>
       {/* STEP 2: The entire structure is replaced with the new layout */}
       <div className="app-layout">
         <Sidebar 
           isOpen={isSidebarOpen} 
-          onNewChat={handleNewChat}  // <-- ADD THIS PROP
-          onSessionSelect={handleLoadSession} // Pass the loading function
-          currentSessionId={sessionId}        // Pass the current session ID for highlighting
+          onNewChat={handleNewChat}
+          onSessionSelect={handleLoadSession}
+          currentSessionId={sessionId}
+          sessions={sessions} // Pass the session list
+          error={sessionsError}   // Pass any errors
+          onSessionDelete={handleDeleteSession} // Pass the delete handler
         />
         <div className={`main-content ${isSidebarOpen ? 'sidebar-is-open' : ''}`}>
           <button onClick={toggleSidebar} className="sidebar-toggle-btn">

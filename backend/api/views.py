@@ -165,3 +165,53 @@ async def get_session_history(request, session_id: str):
         return JsonResponse(formatted_history, safe=False, encoder=ObjectIdEncoder)
     except Exception as e:
         return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
+    
+
+async def delete_session_view(request, session_id: str):
+    """
+    Handles the actual deletion of all documents related to a session_id.
+    """
+    print(f"✅ [DB] Attempting to delete all turns for session: {session_id}")
+    try:
+        if conversations_collection is None:
+            return JsonResponse({"error": "Database not connected"}, status=500)
+
+        # The core command: delete all documents that match the session_id
+        result = await conversations_collection.delete_many({"session_id": session_id})
+        
+        # Log the outcome for debugging
+        print(f"  > MongoDB operation complete. Deleted {result.deleted_count} documents.")
+
+        if result.deleted_count > 0:
+            return JsonResponse({
+                "status": "success",
+                "message": f"Successfully deleted session {session_id}",
+                "deleted_count": result.deleted_count
+            })
+        else:
+            # This case handles if a session_id is provided that doesn't exist
+            return JsonResponse({
+                "status": "not_found",
+                "message": f"No session found with ID {session_id}"
+            }, status=404)
+
+    except Exception as e:
+        print(f"🚨 [DB] An error occurred during session deletion: {str(e)}")
+        return JsonResponse({"error": "An internal server error occurred during deletion."}, status=500)
+
+
+# --- NEW FUNCTION 2: The URL Dispatcher ---
+@csrf_exempt
+@require_http_methods(["GET", "DELETE"]) # This view now accepts GET and DELETE
+async def session_detail_view(request, session_id: str):
+    """
+    Dispatches requests for a specific session ID to the correct handler
+    based on the HTTP method.
+    """
+    if request.method == 'GET':
+        # If it's a GET request, pass it to the existing history function
+        return await get_session_history(request, session_id)
+    
+    elif request.method == 'DELETE':
+        # If it's a DELETE request, pass it to our new delete function
+        return await delete_session_view(request, session_id)
