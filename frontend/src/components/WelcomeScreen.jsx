@@ -1,21 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
+import HexagonalGrid from './landing/HexagonalGrid';
+import ArgonCore from './landing/ArgonCore';
+import './WelcomeScreen.css';
 
-function WelcomeScreen({ onExampleClick }) {
+// The component now accepts all the props from App.jsx
+function WelcomeScreen({ onExampleClick, prompt, setPrompt, handleSubmit, isLoading, forceWebSearch, 
+  setForceWebSearch, isSpeechRecognitionSupported, isListening, handleMicClick }) {
+  // This state now lives in the parent and controls the entire screen's effect
+  const [isEnergized, setIsEnergized] = useState(false);
+
   return (
-    <div className="welcome-screen">
-      <h1>Perplexity Clone</h1>
-      <p>Ask anything. Get direct answers or comprehensive results from the web.</p>
-      <div className="example-prompts">
-        <button onClick={() => onExampleClick("What is Bernoulli's principle?")}>
-          → What is Bernoulli's principle?
-        </button>
-        <button onClick={() => onExampleClick("Create a short story about a brave knight")}>
-          → Create a short story...
-        </button>
-        <button onClick={() => onExampleClick("Who is the current CEO of OpenAI?")}>
-          → Who is the current CEO of OpenAI?
-        </button>
-      </div>
+    // We apply the dynamic class here to affect the entire screen
+    <div className={`welcome-container ${isEnergized ? 'is-energized' : ''}`}>
+      <HexagonalGrid />
+      <ArgonCore 
+        // Pass down all the original props
+        onExampleClick={onExampleClick}
+        prompt={prompt}
+        setPrompt={setPrompt}
+        handleSubmit={handleSubmit}
+        isLoading={isLoading}
+        // Pass the state setter function down so the child can control the parent's state
+        onFocusChange={setIsEnergized} 
+
+        forceWebSearch={forceWebSearch}
+        setForceWebSearch={setForceWebSearch}
+        isSpeechRecognitionSupported={isSpeechRecognitionSupported}
+        isListening={isListening}
+        handleMicClick={handleMicClick}
+      />
     </div>
   );
 }

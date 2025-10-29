@@ -1,0 +1,416 @@
+/* ========================================================================
+   GLOBAL LAYOUT & BACKGROUND
+   ======================================================================== */
+
+.welcome-container {
+    position: absolute;
+    inset: 0;
+    background-color: black;
+    overflow: hidden;
+     z-index: 100;
+    transition: all 0.3s ease-in-out;
+}
+
+.hexagon-container {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    -webkit-mask-image: radial-gradient(circle at center, transparent 25%, black 60%);
+    mask-image: radial-gradient(circle at center, transparent 25%, black 60%);
+}
+
+svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* ========================================================================
+   HEXAGON GRID EFFECT
+   ======================================================================== */
+
+.hexagon-display {
+    fill: rgba(0, 0, 0, 0.01);
+    stroke: rgba(255, 255, 255, 0.05);
+    stroke-width: 1;
+    pointer-events: none; /* CRITICAL: This layer ignores the mouse */
+    transform-origin: center;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 2. The INVISIBLE layer that will capture mouse events */
+.hexagon-sensor {
+    fill: transparent;
+    stroke: transparent;
+    cursor: pointer;
+    /* This layer is the only one that interacts with the mouse */
+}
+
+/* 3. A class we will add with JavaScript to create the glow effect */
+.hexagon-display.is-hovered {
+    fill: rgba(255, 255, 255, 0.05);
+    stroke: #ffffff;
+    stroke-width: 1.5px;
+    filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.5));
+}
+
+
+/* ========================================================================
+   ARGON CORE CONTAINER
+   ======================================================================== */
+
+.argon-core {
+    position: relative; /* This is the positioning context for the electrons */
+    width: 100%;
+    height: 100vh;
+    pointer-events: none;
+}
+
+.argon-content {
+    position: relative;
+    z-index: 10;
+    pointer-events: none; /* CRITICAL: Makes the wrapper transparent to the mouse */
+
+    /* Restores the correct spacious layout */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between; /* Pushes content to top/bottom */
+    width: 100%;
+    height: 100%;
+    padding: 8vh 20px; /* Restores the vertical padding */
+    box-sizing: border-box;
+}
+
+.landing-header,
+.landing-prompt-form,
+.example-prompts-landing {
+    pointer-events: auto; /* Re-enables mouse events for these elements and their children */
+}
+
+/* ========================================================================
+   SECTION 1 — HEADER
+   ======================================================================== */
+
+.landing-header {
+    text-align: center;
+}
+
+.landing-header h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+    margin: 0;
+}
+
+.landing-header .tagline {
+    font-size: 1.1rem;
+    color: #a0a0a0;
+    margin-top: 10px;
+}
+
+.keywords {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+    justify-content: center;
+}
+
+.keyword-item {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #a0a0a0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 6px 12px;
+    border-radius: 20px;
+    background-color: rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease; /* Add this for a smooth effect */
+}
+
+.keyword-item:hover {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(255, 255, 255, 0.1);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* This creates the glow */
+}
+
+/* ========================================================================
+   SECTION 2 — SEARCH FORM
+   ======================================================================== */
+
+.landing-prompt-form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 700px;
+    background-color: #1e1e1e;
+    border: 2px solid #2a2a2a;
+    border-radius: 20px; 
+    padding: 32px 32px 32px 40px; 
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.landing-input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: #e0e0e0;
+    font-size: 1.1rem; /* Slightly larger text */
+    font-family: 'Inter', sans-serif;
+    height: 30px; /* Explicit height for the input area */
+}
+
+.landing-input:focus {
+    outline: none;
+}
+
+.landing-input::placeholder {
+    color: #888;
+}
+
+.landing-submit-btn {
+    background-color: rgb(39, 108, 135); /* Makes background invisible */
+    color: white; /* Muted text color */
+    border: 1px solid #3a3a3a; /* Subtle border */
+    padding: 10px 22px; /* Adjusted padding */
+    border-radius: 12px; /* More rounded */
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.landing-submit-btn:hover {
+    background-color: #383838;
+}
+
+.landing-submit-btn:disabled {
+    background-color: #222;
+    color: #555;
+    cursor: not-allowed;
+}
+
+/* ========================================================================
+   SECTION 3 — EXAMPLE PROMPTS
+   ======================================================================== */
+
+.example-prompts-landing {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-bottom: 150px; /* Add this to create space below the search bar */
+}
+
+.example-prompts-landing button {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #b0b0b0;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.example-prompts-landing button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #e0e0e0;
+}
+
+/* ========================================================================
+   SPINNER & ELECTRONS (ORBITAL ANIMATION)
+   ======================================================================== */
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.electron {
+    position: absolute;
+    position: relative;
+    width: 4px;
+    height: 4px;
+    background-color: white;
+    border-radius: 50%;
+    box-shadow:
+        0 0 10px 2px #FFD700,
+        0 0 20px 4px rgba(255, 215, 0, 0.5);
+    top: 50%;
+    left: 50%;
+    z-index: 5;
+    transition: filter 0.3s ease, animation-duration 0.5s ease;
+}
+
+.electron::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    
+    /* Start hidden and scaled to zero width */
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left center; /* Animate outwards from the electron */
+    
+    transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1); /* A smooth, bouncy transition */
+}
+
+/* This defines the actual trail shape using a long, fading box-shadow */
+.electron::after {
+    box-shadow:
+        /* The "head" of the trail, right behind the electron. Bright and sharp. */
+        5px 0 2px -1px rgba(255, 215, 0, 0.8),
+        
+        /* The main body of the trail, stretching out while staying thin. */
+        15px 0 3px -1px rgba(255, 215, 0, 0.7),
+        30px 0 4px -2px rgba(255, 215, 0, 0.6),
+        45px 0 5px -2px rgba(255, 215, 0, 0.4),
+        60px 0 6px -3px rgba(255, 215, 0, 0.3),
+
+        /* The end of the tail, getting very long and fading out completely. */
+        75px 0 7px -3px rgba(255, 215, 0, 0.15),
+        90px 0 8px -4px rgba(255, 215, 0, 0.05);
+}
+
+
+/* Orbital Paths */
+@keyframes orbit-1 {
+    0%   { transform: rotate(0deg) translateX(250px) rotate(0deg); }
+    100% { transform: rotate(360deg) translateX(250px) rotate(-360deg); }
+}
+
+@keyframes orbit-2 {
+    0%   { transform: rotate(0deg) translateX(350px) translateY(20px) rotate(0deg) scale(0.8); }
+    100% { transform: rotate(-360deg) translateX(350px) translateY(20px) rotate(360deg) scale(0.8); }
+}
+
+@keyframes orbit-3 {
+    0%   { transform: rotate(0deg) translateX(450px) translateY(-30px) rotate(0deg) scale(1.1); }
+    100% { transform: rotate(360deg) translateX(450px) translateY(-30px) rotate(-360deg) scale(1.1); }
+}
+
+@keyframes orbit-4 {
+    0%   { transform: rotate(0deg) translateX(550px) translateY(10px) rotate(0deg) scale(0.9); }
+    100% { transform: rotate(-360deg) translateX(550px) translateY(10px) rotate(360deg) scale(0.9); }
+}
+
+.electron-1 { animation: orbit-1 12s linear infinite; }
+.electron-2 { animation: orbit-2 15s linear infinite; }
+.electron-3 { animation: orbit-3 20s linear infinite; }
+.electron-4 { animation: orbit-4 18s linear infinite; }
+
+/* ========================================================================
+   EXCITATION CYCLE (INTERACTION STATES)
+   ======================================================================== */
+
+.welcome-container.is-energized .landing-prompt-form {
+    border-color: #4a4a4a;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.welcome-container.is-energized .electron::after {
+    opacity: 1;
+    transform: scaleX(1);
+}
+
+.welcome-container.is-energized .hexagon {
+    stroke: rgba(255, 255, 255, 0.25);
+}
+
+.electron-small {
+    width: 6px;
+    height: 6px;
+    box-shadow:
+        0 0 10px 2px #FFD700,
+        0 0 12px 2px rgba(255, 215, 0, 0.4); /* Gold glow */
+}
+
+@keyframes orbit-5 {
+    0%   { transform: rotate(0deg) translateX(300px) translateY(-80px) rotate(0deg) scale(1); }
+    100% { transform: rotate(360deg) translateX(300px) translateY(-80px) rotate(-360deg) scale(1); }
+}
+
+@keyframes orbit-6 {
+    0%   { transform: rotate(0deg) translateX(400px) translateY(100px) rotate(0deg) scale(0.9); }
+    100% { transform: rotate(-360deg) translateX(400px) translateY(100px) rotate(360deg) scale(0.9); }
+}
+
+@keyframes orbit-7 {
+    0%   { transform: rotate(0deg) translateX(600px) rotate(0deg) scale(1.1); }
+    100% { transform: rotate(360deg) translateX(600px) rotate(-360deg) scale(1.1); }
+}
+
+.electron-5 { animation: orbit-5 22s linear infinite; }
+.electron-6 { animation: orbit-6 25s linear infinite; }
+.electron-7 { animation: orbit-7 30s linear infinite; }
+
+
+.electron-tiny {
+    width: 8px;
+    height: 8px;
+    box-shadow:
+        0 0 10px 2px #FFD700,
+        0 0 8px 2px rgba(255, 215, 0, 0.3); /* Gold glow */
+}
+
+@keyframes orbit-8 {
+    0%   { transform: rotate(0deg) translateX(800px) translateY(50px) rotate(0deg) scale(1); }
+    100% { transform: rotate(360deg) translateX(800px) translateY(50px) rotate(-360deg) scale(1); }
+}
+
+@keyframes orbit-9 {
+    0%   { transform: rotate(0deg) translateX(750px) translateY(-150px) rotate(0deg) scale(0.9); }
+    100% { transform: rotate(-360deg) translateX(750px) translateY(-150px) rotate(360deg) scale(0.9); }
+}
+
+@keyframes orbit-10 {
+    0%   { transform: rotate(0deg) translateX(900px) rotate(0deg) scale(1.2); }
+    100% { transform: rotate(360deg) translateX(900px) rotate(-360deg) scale(1.2); }
+}
+
+
+.electron-8 { animation: orbit-8 35s linear infinite; }
+.electron-9 { animation: orbit-9 40s linear infinite; }
+.electron-10 { animation: orbit-10 45s linear infinite; }
+
+
+/* ADD ALL OF THESE NEW KEYFRAMES */
+
+/* Counter-Rotation Paths */
+@keyframes counter-orbit-1 { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+@keyframes counter-orbit-2 { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes counter-orbit-3 { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+@keyframes counter-orbit-4 { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes counter-orbit-5 { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+@keyframes counter-orbit-6 { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes counter-orbit-7 { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+@keyframes counter-orbit-8 { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+@keyframes counter-orbit-9 { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes counter-orbit-10 { 0% { transform: rotate(0deg); } 100% { transform: rotate(-360deg); } }
+
+
+/* ADD ALL OF THESE NEW RULES TO APPLY THE COUNTER-ROTATIONS */
+
+.electron-1::after  { animation: counter-orbit-1 12s linear infinite; }
+.electron-2::after  { animation: counter-orbit-2 15s linear infinite; }
+.electron-3::after  { animation: counter-orbit-3 20s linear infinite; }
+.electron-4::after  { animation: counter-orbit-4 18s linear infinite; }
+.electron-5::after  { animation: counter-orbit-5 22s linear infinite; }
+.electron-6::after  { animation: counter-orbit-6 25s linear infinite; }
+.electron-7::after  { animation: counter-orbit-7 30s linear infinite; }
+.electron-8::after  { animation: counter-orbit-8 35s linear infinite; }
+.electron-9::after  { animation: counter-orbit-9 40s linear infinite; }
+.electron-10::after { animation: counter-orbit-10 45s linear infinite; }

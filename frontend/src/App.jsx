@@ -1,12 +1,13 @@
 // src/App.jsx - RESTRUCTURED FOR NEW LAYOUT
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ThemeProvider } from '@thesysai/genui-sdk';
 import ResponseContainer from './components/ResponseContainer';
 import WelcomeScreen from './components/WelcomeScreen';
 import Sidebar from './components/Sidebar'; // <-- STEP 1: Import the new component
 import './index.css';
 import { v4 as uuidv4 } from 'uuid';
+import { BsMicFill } from 'react-icons/bs';
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -17,6 +18,59 @@ function App() {
 
   const [sessions, setSessions] = useState([]);
   const [sessionsError, setSessionsError] = useState(null);
+
+  const [forceWebSearch, setForceWebSearch] = useState(false);
+
+  const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(false);
+
+  const [isListening, setIsListening] = useState(false);
+  const speechRecognitionRef = useRef(null);
+
+
+    useEffect(() => {
+    // --- START OF NEW SPEECH RECOGNITION LOGIC ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      setIsSpeechRecognitionSupported(true);
+      
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        // Update the prompt state with the live transcription
+        setPrompt(finalTranscript + interimTranscript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false); // Turn off listening state on error
+      };
+
+      recognition.onend = () => {
+        setIsListening(false); // Ensure listening is off when recognition ends
+      };
+
+      // Store the configured instance in our ref
+      speechRecognitionRef.current = recognition;
+      
+    } else {
+      setIsSpeechRecognitionSupported(false);
+    }
+    // --- END OF NEW SPEECH RECOGNITION LOGIC ---
+  }, []);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -39,6 +93,21 @@ function App() {
     setIsSidebarOpen(prev => !prev);
   };
 
+  const handleMicClick = () => {
+    if (!speechRecognitionRef.current) {
+      return; // Do nothing if speech recognition is not supported/initialized
+    }
+
+    if (isListening) {
+      // If already listening, stop it
+      speechRecognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      // If not listening, start it
+      speechRecognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
 
     const handleNewChat = () => {
     // Reset the chat history to an empty array
@@ -145,15 +214,19 @@ function App() {
     console.log("  [STATE] Initial response object added to chat history.");
 
     try {
+        const requestPayload = {
+        prompt: currentPrompt,
+        session_id: currentSessionId,
+        turn_number: chatHistory.length + 1,
+        context_package: context_package,
+        force_web_search: forceWebSearch,
+      };
+      console.log("  [DEBUG] Payload being sent to backend:", requestPayload);
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}generate/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: currentPrompt,
-          session_id: currentSessionId,
-          turn_number: chatHistory.length + 1, // The new turn number
-          context_package: context_package,
-        }),
+        body: JSON.stringify(requestPayload),
 
       });
       console.log("  [NETWORK] Initial response received from backend. Status:", response.status);
@@ -337,7 +410,18 @@ function App() {
           </button>
           <div className="chat-area"> {/* Renamed from response-area */}
             {chatHistory.length === 0 ? (
-              <WelcomeScreen onExampleClick={handleExampleClick} />
+              <WelcomeScreen 
+                onExampleClick={handleExampleClick}
+                prompt={prompt}
+                setPrompt={setPrompt}
+                handleSubmit={handleSubmit}
+                isLoading={isLoading}
+                forceWebSearch={forceWebSearch}
+                setForceWebSearch={setForceWebSearch}
+                isSpeechRecognitionSupported={isSpeechRecognitionSupported}
+                isListening={isListening}
+                handleMicClick={handleMicClick}
+              />
             ) : (
               chatHistory.map((chat) => (
                 <ResponseContainer key={chat.key} response={chat} />
@@ -347,6 +431,30 @@ function App() {
 
           <div className="prompt-section"> {/* Wrapper div for form */}
             <form onSubmit={handleSubmit} className="prompt-form">
+
+              <button
+                type="button" // Important: type="button" prevents form submission
+                onClick={() => setForceWebSearch(prev => !prev)}
+                className={`web-search-toggle ${forceWebSearch ? 'active' : ''}`}
+                title="Force Web Search"
+              >
+                🌐
+              </button>
+
+              {isSpeechRecognitionSupported && (
+                <button
+                  type="button"
+                  className={`mic-button ${isListening ? 'active' : ''}`}
+                  onClick={handleMicClick} 
+                  // --- END OF MODIFICATION ---
+                  title="Use Microphone"
+                >
+                  <BsMicFill />
+                </button>
+              )}
+
+
+
               <input
                 type="text"
                 value={prompt}

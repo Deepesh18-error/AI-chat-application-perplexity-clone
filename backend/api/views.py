@@ -24,6 +24,7 @@ async def generate_view(request):
         session_id = data.get("session_id")
         turn_number = data.get("turn_number")
         context_package = data.get("context_package", {})
+        force_web_search = data.get("force_web_search", False)
 
         if not prompt or not session_id or not turn_number:
             error_msg = "Prompt, session_id, and turn_number are required."
@@ -49,7 +50,12 @@ async def generate_view(request):
             await conversations_collection.insert_one(initial_session_doc)
             print("  > Initial record created successfully.")
 
-        path = await services.get_intelligent_path(prompt, context_package)
+        if force_web_search:
+            path = "search_required"
+            print("  > Web Search Path FORCED by client request.")
+        else:
+            print("  > No override detected. Executing intelligent routing pipeline...")
+            path = await services.get_intelligent_path(prompt, context_package)
         
         event_generator = services.generate_and_stream_answer(
             prompt, path, session_id, turn_number, context_package
