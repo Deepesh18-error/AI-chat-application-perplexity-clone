@@ -7,7 +7,9 @@ import WelcomeScreen from './components/WelcomeScreen';
 import Sidebar from './components/Sidebar'; // <-- STEP 1: Import the new component
 import './index.css';
 import { v4 as uuidv4 } from 'uuid';
-import { BsMicFill } from 'react-icons/bs';
+import { HiGlobe, HiMicrophone } from 'react-icons/hi';
+import TextareaAutosize from 'react-textarea-autosize';
+
 
 function App() {
   const [prompt, setPrompt] = useState('');
@@ -92,6 +94,16 @@ function App() {
    const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
+
+
+  const handleKeyDown = (e) => {
+    // Check if Enter is pressed AND the Shift key is NOT pressed
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevents adding a newline character before submitting
+      handleSubmit(e);    // Trigger the form submission
+    }
+  };
+
 
   const handleMicClick = () => {
     if (!speechRecognitionRef.current) {
@@ -394,7 +406,8 @@ function App() {
   return (
     <ThemeProvider>
       {/* STEP 2: The entire structure is replaced with the new layout */}
-      <div className="app-layout">
+      <div className={`app-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+        {chatHistory.length > 0 && (
         <Sidebar 
           isOpen={isSidebarOpen} 
           onNewChat={handleNewChat}
@@ -404,10 +417,13 @@ function App() {
           error={sessionsError}   // Pass any errors
           onSessionDelete={handleDeleteSession} // Pass the delete handler
         />
+        )}
         <div className={`main-content ${isSidebarOpen ? 'sidebar-is-open' : ''}`}>
-          <button onClick={toggleSidebar} className="sidebar-toggle-btn">
-            ☰
-          </button>
+        {chatHistory.length > 0 && (
+            <button onClick={toggleSidebar} className="sidebar-toggle-btn">
+              ☰
+            </button>
+          )}
           <div className="chat-area"> {/* Renamed from response-area */}
             {chatHistory.length === 0 ? (
               <WelcomeScreen 
@@ -431,41 +447,50 @@ function App() {
 
           <div className="prompt-section"> {/* Wrapper div for form */}
             <form onSubmit={handleSubmit} className="prompt-form">
+            {/* The Textarea is now the first and only direct child */}
+            <TextareaAutosize
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Ask me anything..."
+              disabled={isLoading}
+              onKeyDown={handleKeyDown}
+              rows={1}
+              maxRows={8}
+              className="prompt-textarea"
+            />
 
-              <button
-                type="button" // Important: type="button" prevents form submission
-                onClick={() => setForceWebSearch(prev => !prev)}
-                className={`web-search-toggle ${forceWebSearch ? 'active' : ''}`}
-                title="Force Web Search"
-              >
-                🌐
-              </button>
-
-              {isSpeechRecognitionSupported && (
+            {/* A new container for all the buttons, just like the landing page */}
+            <div className="prompt-actions-bar">
+              <div className="prompt-actions-left">
                 <button
                   type="button"
-                  className={`mic-button ${isListening ? 'active' : ''}`}
-                  onClick={handleMicClick} 
-                  // --- END OF MODIFICATION ---
-                  title="Use Microphone"
+                  className={`action-btn web-search-toggle ${forceWebSearch ? 'active' : ''}`}
+                  onClick={() => setForceWebSearch(!forceWebSearch)}
+                  title="Force Web Search"
                 >
-                  <BsMicFill />
+                  <HiGlobe />
                 </button>
-              )}
-
-
-
-              <input
-                type="text"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Ask me anything..."
-                disabled={isLoading}
-              />
-              <button type="submit" disabled={isLoading}>
-                {isLoading ? '...' : 'Ask'}
-              </button>
-            </form>
+                <button
+                  type="button"
+                  className={`action-btn ${isListening ? 'active' : ''}`}
+                  oonClick={handleMicClick} 
+                  title="Voice Input"
+                >
+                  <HiMicrophone />
+                </button>
+              </div>
+              
+              <div className="prompt-actions-right">
+                <button 
+                  type="submit" 
+                  className="submit-btn" 
+                  disabled={isLoading || !prompt.trim()}
+                >
+                  Ask
+                </button>
+              </div>
+            </div>
+          </form>
           </div>
         </div>
       </div>

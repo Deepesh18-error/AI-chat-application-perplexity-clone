@@ -70,23 +70,29 @@ svg {
 .argon-content {
     position: relative;
     z-index: 10;
-    pointer-events: none; /* CRITICAL: Makes the wrapper transparent to the mouse */
-
-    /* Restores the correct spacious layout */
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between; /* Pushes content to top/bottom */
+    justify-content: flex-start;
     width: 100%;
     height: 100%;
-    padding: 8vh 20px; /* Restores the vertical padding */
+    padding-top: 1vh;
+    padding-left: 20px;
+    padding-right: 20px;
     box-sizing: border-box;
+    pointer-events: none; /* <-- ADD THIS LINE to re-enable mouse events for all UI */
+}
+
+
+.landing-header {
+    text-align: center;
+    margin-bottom: 5vh; /* <-- CRITICAL: Creates the large vertical gap you want */
 }
 
 .landing-header,
 .landing-prompt-form,
 .example-prompts-landing {
-    pointer-events: auto; /* Re-enables mouse events for these elements and their children */
+    pointer-events: auto;
 }
 
 /* ========================================================================
@@ -105,10 +111,12 @@ svg {
     margin: 0;
 }
 
-.landing-header .tagline {
-    font-size: 1.1rem;
-    color: #a0a0a0;
-    margin-top: 10px;
+.tagline {
+    font-size: 1.75rem; /* Make it larger */
+    font-weight: 500;
+    color: #e0e0e0;     /* Make it brighter */
+    margin-bottom: 30px; /* Add space between it and the search bar */
+    text-align: center;
 }
 
 .keywords {
@@ -124,9 +132,9 @@ svg {
     color: #a0a0a0;
     border: 1px solid rgba(255, 255, 255, 0.2);
     padding: 6px 12px;
-    border-radius: 20px;
+    border-radius: 8px; /* <-- CHANGED from 20px to make it less circular */
     background-color: rgba(255, 255, 255, 0.05);
-    transition: all 0.3s ease; /* Add this for a smooth effect */
+    transition: all 0.3s ease;
 }
 
 .keyword-item:hover {
@@ -142,15 +150,16 @@ svg {
 
 .landing-prompt-form {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 10px;
     width: 100%;
     max-width: 700px;
     background-color: #1e1e1e;
     border: 2px solid #2a2a2a;
     border-radius: 20px; 
-    padding: 32px 32px 32px 40px; 
+    padding: 16px 20px 12px 20px;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 80px;
 }
 
 .landing-input {
@@ -161,6 +170,9 @@ svg {
     font-size: 1.1rem; /* Slightly larger text */
     font-family: 'Inter', sans-serif;
     height: 30px; /* Explicit height for the input area */
+    margin-bottom: 16px; /* Space between input and action bar */
+    min-height: 40px; /* Give it some initial height */
+    resize: none;
 }
 
 .landing-input:focus {
@@ -194,6 +206,65 @@ svg {
     cursor: not-allowed;
 }
 
+
+.landing-actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.landing-actions-left,
+.landing-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* A new unified style for the left-side icon buttons */
+.action-btn {
+    background-color: #2e2e2e;
+    color: grey;
+    border: 1px solid #3a3a3a; /* <-- Default border is dark grey */
+    border-radius: 12px;
+    font-size: 100px; 
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    width: 36px;
+    height: 36px;
+}
+
+.submit-btn {
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+.submit-btn:hover { background-color: blueviolet; }
+.submit-btn:disabled { background-color: #2a2a2a; color: #555; cursor: not-allowed; }
+
+
+.landing-prompt-form .action-btn:hover {
+    background-color: #3f3f3f; 
+    color: whitesmoke;         /* <-- This sets the ICON color on hover */
+    border-color: white;     /* <-- THIS IS THE FIX: We explicitly control the border color on hover now */
+}
+
+.landing-prompt-form .web-search-toggle.active {
+    background-color: rgb(81, 42, 153);/* <-- This is your desired active background */
+    color: white;             
+    border-color: gainsboro;     /* Match the border to the background */
+}
+
+
 /* ========================================================================
    SECTION 3 — EXAMPLE PROMPTS
    ======================================================================== */
@@ -203,6 +274,7 @@ svg {
     gap: 15px;
     justify-content: center;
     margin-bottom: 150px; /* Add this to create space below the search bar */
+    padding-bottom: 2vh;
 }
 
 .example-prompts-landing button {
@@ -317,8 +389,8 @@ svg {
    ======================================================================== */
 
 .welcome-container.is-energized .landing-prompt-form {
-    border-color: #4a4a4a;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    border-color: grey;
+    box-shadow: 0 0 20px rgba(39, 37, 37, 0.5);
 }
 
 .welcome-container.is-energized .electron::after {

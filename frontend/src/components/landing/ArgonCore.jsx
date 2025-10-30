@@ -1,9 +1,19 @@
 import React from 'react';
-import { FiLoader } from 'react-icons/fi';
+import { FiLoader, FiGlobe } from 'react-icons/fi';
 import { BsMicFill } from 'react-icons/bs';
+import TextareaAutosize from 'react-textarea-autosize';
+
 
 function ArgonCore({ onExampleClick, prompt, setPrompt, handleSubmit, isLoading, onFocusChange, forceWebSearch, setForceWebSearch, 
   isSpeechRecognitionSupported, isListening, handleMicClick }) {
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      // The handleSubmit prop is already wrapped in handleFormSubmit
+      handleFormSubmit(e); 
+    }
+  };
   const handleFormSubmit = (e) => {
     e.preventDefault();
     handleSubmit(e);
@@ -27,10 +37,9 @@ function ArgonCore({ onExampleClick, prompt, setPrompt, handleSubmit, isLoading,
 
       {/* --- THIS NEW CONTAINER WRAPS ALL YOUR UI CONTENT --- */}
       <div className="argon-content">
-        {/* SECTION 1: The Header */}
+  {/* SECTION 1: The Header */}
         <div className="landing-header">
-          <h1>MEV</h1> {/* I've updated the name to match your latest image */}
-          <p className="tagline">Catalyze a query. Emit an answer.</p>
+          <h1>MEV</h1>
           <div className="keywords">
             <span className="keyword-item">Interactive UI</span>
             <span className="keyword-item">LLM Response</span>
@@ -39,45 +48,55 @@ function ArgonCore({ onExampleClick, prompt, setPrompt, handleSubmit, isLoading,
           </div>
         </div>
 
+        {/* NEW MESSAGE AREA */}
+        <p className="tagline">What can I help with?</p>
+ 
+
         {/* SECTION 2: The Search Form */}
         <form onSubmit={handleFormSubmit} className="landing-prompt-form">
+          <TextareaAutosize
+                  className="landing-input"
+                  placeholder="Ask me anything..."
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onFocus={() => onFocusChange(true)}
+                  onBlur={() => onFocusChange(false)}
+                  disabled={isLoading}
+                  onKeyDown={handleKeyDown} // <-- Add the handler
+                  rows={1}
+                  maxRows={8}
+                />
+          
+          {/* NEW: A container for all the action buttons at the bottom */}
+          <div className="landing-actions-bar">
+            <div className="landing-actions-left">
+              <button
+                type="button"
+                onClick={() => setForceWebSearch(prev => !prev)}
+                className={`action-btn web-search-toggle ${forceWebSearch ? 'active' : ''}`}
+                title="Force Web Search"
+              >
+                <FiGlobe /> {/* <-- This is the new SVG icon */}
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setForceWebSearch(prev => !prev)}
-            className={`web-search-toggle ${forceWebSearch ? 'active' : ''}`}
-            title="Force Web Search"
-          >
-            🌐
-          </button>
+              {isSpeechRecognitionSupported && (
+                <button
+                  type="button"
+                  className={`action-btn mic-button ${isListening ? 'active' : ''}`}
+                  onClick={handleMicClick}
+                  title="Use Microphone"
+                >
+                  <BsMicFill />
+                </button>
+              )}
+            </div>
 
-          {isSpeechRecognitionSupported && (
-            <button
-              type="button"
-              // --- START OF MODIFICATION ---
-              className={`mic-button ${isListening ? 'active' : ''}`}
-              onClick={handleMicClick}
-              // --- END OF MODIFICATION ---
-              title="Use Microphone"
-            >
-              <BsMicFill />
-            </button>
-          )}
-
-
-          <input
-            type="text"
-            className="landing-input"
-            placeholder="Ask me anything..."
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onFocus={() => onFocusChange(true)}
-            onBlur={() => onFocusChange(false)}
-            disabled={isLoading}
-          />
-          <button type="submit" className="landing-submit-btn" disabled={isLoading || !prompt.trim()}>
-            {isLoading ? <FiLoader className="spinner" /> : 'Ask'}
-          </button>
+            <div className="landing-actions-right">
+              <button type="submit" className="submit-btn" disabled={isLoading || !prompt.trim()}>
+                {isLoading ? <FiLoader className="spinner" /> : 'Ask'}
+              </button>
+            </div>
+          </div>
         </form>
 
         {/* SECTION 3: Example Prompts */}
