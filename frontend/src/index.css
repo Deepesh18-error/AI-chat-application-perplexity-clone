@@ -23,6 +23,36 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html, body {
+  overflow-x: hidden; /* The key to hiding the horizontal scrollbar */
+}
+
+/* --- Step 2: Style the Main Vertical Scrollbar (Firefox) --- */
+body {
+  /* ... (your existing body styles like font-family, etc., remain) ... */
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a transparent; /* Thumb color, then Track color */
+}
+
+/* --- Step 2: Style the Main Vertical Scrollbar (Chrome, Safari, Edge) --- */
+/* This targets the main scrollbar for the entire body */
+body::-webkit-scrollbar {
+  width: 8px; /* A nice, slim width */
+}
+
+body::-webkit-scrollbar-track {
+  background: transparent; /* Make the track invisible, as requested */
+}
+
+body::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a;    /* The dark grey, pill-shaped thumb */
+  border-radius: 10px;
+  border: 2px solid var(--background-color); /* Creates the "floating" effect */
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background-color: #6b6b6b; /* Slightly lighter on hover */
+}
 
 .chat-area {
   flex-grow: 1;
@@ -32,6 +62,8 @@ body {
   /* --- ADD THE FIREFOX-SPECIFIC STYLES HERE --- */
   scrollbar-width: thin;                     /* Makes the scrollbar narrow in Firefox */
   scrollbar-color: #4a4a4a transparent;     /* Sets thumb and track color in Firefox */
+  display: flex;
+  flex-direction: column;
 }
 
 
@@ -69,7 +101,25 @@ body {
 
 /* Tabs */
 .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
-.tabs button { display: flex; align-items: center; gap: 8px; padding: 10px 16px; cursor: pointer; border: none; background-color: transparent; color: var(--text-muted); font-size: 15px; font-weight: 500; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border: none;
+  background-color: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+
+  /* --- ADD THIS LINE --- */
+  /* This prevents "Sources · 7" from breaking into two lines */
+  white-space: nowrap;
+}
+
 .tabs button.active { color: var(--primary-color); border-bottom: 2px solid var(--primary-color); }
 
 /* Tab Content */
@@ -189,18 +239,35 @@ body {
 }
 
 .main-content {
-  flex-grow: 1; /* Takes up all remaining horizontal space */
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
+  flex-grow: 1;
+  display: flex; /* It remains a flex container */
+  flex-direction: column; /* To stack chat on top of prompt */
+  
+  /* 
+   * CRITICAL FIX: We use min-height instead of height.
+   * This allows the container to be AT LEAST the height of the screen,
+   * but it can GROW TALLER if the content inside is long.
+  */
+  min-height: 100vh;
+  
   max-width: 820px;
-  margin: 0 auto; /* Centers the main content area */
+  margin: 0 auto;
   width: 100%;
 }
 
 .chat-area {
-  flex-grow: 1; /* Takes up all available vertical space in the main-content area */
-  overflow-y: auto; /* This is the key that enables INDEPENDENT SCROLLING */
+  /* 
+   * CRITICAL FIX: This makes the chat area expand to fill all
+   * available vertical space, pushing the prompt bar to the bottom.
+  */
+  flex-grow: 1; 
+  
+  /* 
+   * CRITICAL FIX: We remove the internal scrolling.
+   * The content is now free to overflow this container.
+  */
+  overflow-y: visible; /* Or you can remove this line entirely */
+  
   padding: 20px;
   box-sizing: border-box;
 }
@@ -208,9 +275,12 @@ body {
 /* This is the new wrapper for the prompt form at the bottom */
 .prompt-section {
   padding: 20px;
-  padding-top: 15px; /* A little less padding on top */
+  padding-top: 15px;
   border-top: 1px solid var(--border-color);
-  background-color: var(--background-color); /* Ensures it's not transparent on scroll */
+  background-color: var(--background-color);
+  
+  /* A good practice to prevent this from shrinking */
+  flex-shrink: 0;
 }
 
 /* --- COLLAPSIBLE SIDEBAR STYLES --- */
@@ -651,4 +721,211 @@ body {
     background-color: #2a2a2a;
     color: #555;
     cursor: not-allowed;
+}
+
+.turn-container {
+    margin-bottom: 40px; /* Vertical space between conversation turns */
+}
+
+/* --- 2. User Prompt Bubble --- */
+/* This gives the user's question a distinct, subtle container */
+.user-prompt {
+    background-color: #1c1c1c; /* A slightly lighter shade than the main background */
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 20px; /* Space between the user prompt and the AI answer */
+    color: #e0e0e0;
+    font-size: 1.1rem;
+}
+
+/* --- 3. AI Response Container - THE CORE FIX --- */
+/* This implements the "invisible container" and "liberates" the content */
+.ai-response-container {
+    /* Make the container itself invisible */
+    background: transparent;
+    border: none;
+    padding: 0;
+    box-shadow: none;
+
+    /* CRITICAL: Liberate the content from scrolling constraints */
+    overflow: visible; /* Prevents this element from having its own scrollbar */
+    max-height: none;  /* Allows the content to be as tall as it needs */
+}
+
+/* --- Minor tweaks for the content inside the invisible container --- */
+/* We add a little padding to the tab content to align it nicely */
+.tab-content {
+    padding-top: 20px;
+    overflow: visible; /* Also prevent this from scrolling */
+    max-height: none;
+}
+
+
+.ai-response-container.focused-view {
+  /* --- CRITICAL: This makes the container grow to fill all remaining vertical space --- */
+  flex-grow: 1;
+
+  /* It needs to become a flex container for its own children (tabs and content) */
+  display: flex;
+  flex-direction: column;
+
+  /* Since it fills the screen, it needs a background color */
+  background-color: var(--background-color); 
+}
+
+/* --- 3. Make the Tab Content Scrollable inside the Focused View --- */
+/* This transfers the scrolling responsibility to the tab-content area */
+.ai-response-container.focused-view .tab-content {
+  flex-grow: 1; /* Allow the content area to expand */
+  overflow-y: auto; /* Enable scrolling for the content itself */
+  
+  /* Apply our custom scrollbar styles to this specific area */
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a transparent;
+}
+
+.ai-response-container.focused-view .tab-content::-webkit-scrollbar {
+  width: 8px;
+}
+.ai-response-container.focused-view .tab-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ai-response-container.focused-view .tab-content::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a;
+  border-radius: 10px;
+  border: 2px solid var(--background-color);
+}
+.ai-response-container.focused-view .tab-content::-webkit-scrollbar-thumb:hover {
+  background-color: #6b6b6b;
+}
+
+.tabs button svg {
+  /* 
+   * CRITICAL FIX: We explicitly define the width and height.
+   * This forces every icon, regardless of its original design, into a
+   * perfectly uniform 16x16 pixel box, guaranteeing they all appear the same size.
+  */
+  width: 18px;
+  height: 18px;
+
+  /* We keep this to make bold outline icons appear thinner and more consistent */
+  stroke-width: 0.5;
+
+  /* A good practice to prevent the icon from being squished */
+  flex-shrink: 0;
+}
+
+/* ======================================================================
+   PROCESSING TIMELINE STYLES (index.css)
+   ====================================================================== */
+
+.processing-timeline {
+  position: relative;
+  padding-left: 30px; /* Space for the icons and line */
+}
+
+/* The main vertical line */
+.processing-timeline::before {
+  content: '';
+  position: absolute;
+  left: 11px; /* Aligns with the center of the icons */
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background-color: var(--border-color);
+}
+
+.timeline-step {
+  position: relative;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.timeline-icon {
+  font-size: 22px;
+  line-height: 1;
+  background-color: var(--background-color); /* To punch a hole in the line */
+  padding: 2px 0;
+}
+
+/* Icon Status Colors */
+.icon-complete { color: #2ecc71; } /* Green */
+.icon-active { color: #f1c40f; } /* Yellow/Gold */
+.icon-pending { color: #555; }
+
+/* Spinner Animation */
+.spinner {
+  animation: spin 1.2s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.timeline-title {
+  margin: 0;
+  padding-top: 2px; /* Align text with icons */
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.timeline-step.complete .timeline-title {
+  color: var(--text-color);
+}
+.timeline-step.active .timeline-title {
+  color: var(--primary-color);
+}
+
+/* Sub-items (like queries and domains) */
+.timeline-children {
+  margin-top: 10px;
+}
+.sub-item-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.sub-item-list li {
+  margin-bottom: 5px;
+}
+.sub-item-counter {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin: 8px 0 0 0;
+}
+
+/* ======================================================================
+   TIMELINE UI ENHANCEMENTS (index.css)
+   ====================================================================== */
+
+/* --- The new bordered box style --- */
+.sub-item-box {
+  margin-top: 12px;
+  border: 1px solid #444; /* A slightly lighter grey border */
+  border-radius: 8px;
+  padding: 12px 15px;
+  background-color: rgba(255, 255, 255, 0.02); /* A very subtle background tint */
+}
+
+/* --- Style for the "and X more..." button --- */
+.expand-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 8px;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.expand-button:hover {
+  opacity: 0.8;
+  text-decoration: underline;
 }

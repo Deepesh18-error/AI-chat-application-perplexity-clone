@@ -210,18 +210,31 @@ function App() {
     console.log("  [CONTEXT] Assembled context package:", context_package);
 
 
-  const newResponseState = {
+const newResponseState = {
     key: Date.now(),
     prompt: currentPrompt,
+    
+    // --- NEW: The progress object to track the live timeline ---
+    progress: {
+      path: null,                    // 'direct_answer' or 'search_required'
+      currentStage: 'analyzing',     // 'analyzing', 'searching', 'reading', 'synthesizing'
+      queriesGenerated: [],          // To store the search query strings
+      sourcesFound: 0,               // A live counter for found sources
+      sourcesBeingScraped: [],       // To store domains as they are scraped
+      totalScraped: 0,               // The final count of successfully scraped sources
+    },
+    // --- End of new fields ---
     steps: [],
     sources: [],
+    images: [],
     auiSpec: null,
     error: null,
-    isLoading: true,
     summary: null,
     entities: [],
-    images: [],
+
+    isLoadedFromHistory: false,
   };
+
     setChatHistory(prev => [...prev, newResponseState]);
     console.log("  [STATE] Initial response object added to chat history.");
 
@@ -295,8 +308,88 @@ function App() {
             setChatHistory(prev => prev.map((chat, index) => {
               if (index !== prev.length - 1) return chat;
               let updatedState = { ...chat };
+              if (!updatedState.progress) {
+                  updatedState.progress = {};
+              }
 
               switch (eventType) {
+
+                 case 'analysis_complete': {
+                  const eventData = JSON.parse(reconstructedData);
+                  updatedState.progress = { 
+                    ...updatedState.progress, 
+                    path: eventData.path,
+                    currentStage: eventData.path === 'direct_answer' ? 'synthesizing' : 'searching'
+                  };
+                  break;
+                }
+
+                case 'query_generated': {
+                  const eventData = JSON.parse(reconstructedData);
+                  updatedState.progress = {
+                    ...updatedState.progress,
+                    queriesGenerated: [...updatedState.progress.queriesGenerated, eventData.query]
+                  };
+                  break;
+                }
+
+                case 'source_found': {
+                  const eventData = JSON.parse(reconstructedData);
+                  updatedState.progress = {
+                    ...updatedState.progress,
+                    sourcesFound: eventData.count
+                  };
+                  break;
+                }
+
+                case 'urls_complete': {
+                // This event carries the final URL list from the backend.
+                    // We don't need to display it, but we acknowledge it.
+                    console.log("  [STATE] URL retrieval complete.");
+                    break;
+                  }
+
+                case 'scraping_start': {
+                  const eventData = JSON.parse(reconstructedData);
+                  updatedState.progress = {
+                    ...updatedState.progress,
+                    currentStage: 'reading',
+                    sourcesBeingScraped: [...updatedState.progress.sourcesBeingScraped, eventData.domain]
+                  };
+                  break;
+                }
+
+                case 'scraping_complete': {
+                  const eventData = JSON.parse(reconstructedData);
+                  updatedState.progress = {
+                    ...updatedState.progress,
+                    totalScraped: eventData.total_scraped
+                  };
+                  break;
+                }
+
+                case 'scraping_data_complete': {
+                  // This event carries the final scraped data from the backend.
+                  // We don't need to display it, but we acknowledge it.
+                  console.log("  [STATE] Scraping data complete.");
+                  break;
+                }
+
+                case 'synthesis_start': {
+                  updatedState.progress = {
+                    ...updatedState.progress,
+                    currentStage: 'synthesizing'
+                  };
+                  break;
+                }
+
+                case 'queries_complete': {
+                // This event signals that all queries have been generated.
+                // We don't need to update the UI further, but we acknowledge the event.
+                console.log("  [STATE] All queries generated.");
+                break;
+              }
+
                 case 'steps':
                 case 'sources':
                 case 'error': {
@@ -325,24 +418,28 @@ function App() {
                 }
                 
                  case 'turn_metadata': {
-                  try {
-                      const metadata = JSON.parse(reconstructedData);
-                      updatedState.summary = metadata.summary;
-                      updatedState.entities = metadata.entities;
-                      console.log("  [STATE] Received and stored turn metadata. Turn complete.", metadata);
+                      try {
+                          const metadata = JSON.parse(reconstructedData);
+                          updatedState.summary = metadata.summary;
+                          updatedState.entities = metadata.entities;
+                          
+                          // --- CRITICAL FIX: Mark progress as complete ---
+                          updatedState.progress = {
+                            ...updatedState.progress,
+                            currentStage: 'complete'
+                          };
+                          
+                          console.log("  [STATE] Received and stored turn metadata. Turn complete.", metadata);
 
-                      // --- CRITICAL FIX ---
-                      // Since metadata is the TRUE final step, we now unlock the main UI here.
-                      setIsLoading(false); 
-                      console.log("  [STATE] UI unlocked after receiving metadata.");
-                      // --- END OF FIX ---
+                          setIsLoading(false); 
+                          console.log("  [STATE] UI unlocked after receiving metadata.");
 
-                    } catch (e) {
-                      console.error("  [STATE] Failed to parse turn_metadata JSON:", e, reconstructedData);
-                      setIsLoading(false); // Also unlock on error
-                    }
-                    break;
-                  }
+                        } catch (e) {
+                          console.error("  [STATE] Failed to parse turn_metadata JSON:", e, reconstructedData);
+                          setIsLoading(false);
+                        }
+                        break;
+                      }
 
                 case 'finished':
                   break;
@@ -439,8 +536,14 @@ function App() {
                 handleMicClick={handleMicClick}
               />
             ) : (
-              chatHistory.map((chat) => (
-                <ResponseContainer key={chat.key} response={chat} />
+              chatHistory.map((chat, index) => ( // <-- Add "index" to the map function
+                <div key={chat.key} className="turn-container">
+                  <ResponseContainer 
+                    response={chat} 
+                    // --- ADD THIS NEW PROP ---
+                    isLastTurn={index === chatHistory.length - 1} 
+                  />
+                </div>
               ))
             )}
           </div>

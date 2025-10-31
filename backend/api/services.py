@@ -429,10 +429,11 @@ async def get_intelligent_path(prompt: str, context_package: Dict[str, Any]) -> 
 
 
 # stage 2
-def generate_search_queries(prompt: str, context_package: Dict[str, Any]) -> List[str]:
+async def generate_search_queries(prompt: str, context_package: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    Takes a user's natural language prompt and uses the Gemini API
-    to generate a list of targeted search queries.
+    (REFACTORED AS ASYNC GENERATOR - CORRECTED VERSION)
+    Yields `query_generated` events for each query, then yields a final
+    `queries_complete` event with the full list.
     """
     conversation_history = _format_context_for_prompt(context_package)
 
@@ -472,14 +473,20 @@ You must respond with ONLY a valid JSON object with a single key "queries", cont
         if "queries" not in response_json or not isinstance(response_json["queries"], list):
             raise GeminiError("Invalid JSON: 'queries' key is missing or not a list.")
             
-        queries = response_json["queries"]
-        print(f"✅ [SERVICES] Successfully received context-aware queries: {queries}")
-        return queries
+        generated_queries = response_json["queries"]
+        
+        # --- CORRECTED LOGIC: YIELD each query individually ---
+        for query in generated_queries:
+            yield {"event": "query_generated", "data": {"query": query}}
+        
+        # --- NEW: YIELD the complete list as a special event ---
+        yield {"event": "queries_complete", "data": {"queries": generated_queries}}
+        
+        print(f"✅ [SERVICES] Successfully generated and yielded queries: {generated_queries}")
 
     except Exception as e:
         print(f"🚨 [SERVICES] An error occurred while generating search queries: {e}")
-        raise GeminiError(f"Failed to generate search queries: {e}")
-
+        yield {"event": "error", "data": {"message": f"Failed to generate search queries: {e}"}}
 
 # stage 3
 
@@ -568,28 +575,41 @@ async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
         return []
 
 
-async def get_urls_from_queries(queries: List[str]) -> List[str]:
+async def get_urls_from_queries(queries: List[str]) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    Takes a list of search queries, fetches results concurrently, and returns
-    a de-duplicated and LIMITED list of URLs.
+    (CORRECTED FOR LIVE STREAMING)
+    Fetches results concurrently and yields `source_found` events in real-time
+    as results come in.
     """
     print(f"✅ [SERVICES] Starting concurrent search for {len(queries)} queries...")
     tasks = [_search_tavily_async(query) for query in queries]
-    all_results = await asyncio.gather(*tasks)
-    flat_results = [item for sublist in all_results for item in sublist]
-    urls = [result["url"] for result in flat_results if "url" in result]
-    print(f"✅ [SERVICES] Found {len(urls)} total URLs (before de-duplication).")
     
-    unique_urls = list(dict.fromkeys(urls))
+    all_urls = []
+    source_count = 0
+
+    # Use asyncio.as_completed to process tasks as they finish
+    for future in asyncio.as_completed(tasks):
+        results_from_one_query = await future
+        urls_from_one_query = [result["url"] for result in results_from_one_query if "url" in result]
+        
+        # As soon as we get URLs from one query, update the total count and yield
+        if urls_from_one_query:
+            all_urls.extend(urls_from_one_query)
+            source_count = len(all_urls) # A running total
+            yield {"event": "source_found", "data": {"count": source_count}}
+            
+    print(f"✅ [SERVICES] Found {len(all_urls)} total URLs (before de-duplication).")
+    
+    unique_urls = list(dict.fromkeys(all_urls))
     print(f"✅ [SERVICES] Found {len(unique_urls)} unique URLs.")
 
-    # --- THIS IS THE NEW OPTIMIZATION ---
     MAX_URLS_TO_SCRAPE = 7
     limited_urls = unique_urls[:MAX_URLS_TO_SCRAPE]
     print(f"✅ [SERVICES] Limiting to {len(limited_urls)} URLs for scraping.")
-    # ------------------------------------
 
-    return limited_urls
+    # Yield the final list of URLs to be used by the orchestrator
+    yield {"event": "urls_complete", "data": {"urls": limited_urls}}
+
 
 # stage 4
 async def _scrape_one_url(crawler: AsyncWebCrawler, url: str) -> Dict[str, str]:
@@ -626,7 +646,7 @@ async def _scrape_one_url(crawler: AsyncWebCrawler, url: str) -> Dict[str, str]:
         return {"source": url, "content": ""}
 
 
-async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
+async def scrape_urls_in_parallel(urls: List[str]) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Takes a list of URLs and scrapes them all in parallel using Crawl4AI.
     It then filters out failed or empty scrapes.
@@ -645,10 +665,14 @@ async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
     # The 'async with' block ensures the browser resources are cleaned up properly.
     async with AsyncWebCrawler() as crawler:
         #  1. Prepare the Tasks 
-        tasks = [_scrape_one_url(crawler, url) for url in urls]
+        tasks = []
+        for url in urls:
+            # Extract domain for the event
+            domain = url.split('/')[2].replace('www.', '')
+            # --- NEW: YIELD event BEFORE starting scrape ---
+            yield {"event": "scraping_start", "data": {"domain": domain}}
+            tasks.append(_scrape_one_url(crawler, url))
 
-        #  2. Execute Concurrently 
-        # asyncio.gather runs all scraping jobs at the same time.
         results = await asyncio.gather(*tasks)
 
         #  3. Process and Filter Results 
@@ -659,8 +683,11 @@ async def scrape_urls_in_parallel(urls: List[str]) -> List[Dict[str, str]]:
             else:
                 print(f"  - Discarding empty result for: {result.get('source')}")
 
-    print(f"✅ [SERVICES] Finished scraping. Successfully extracted content from {len(scraped_data)} out of {len(urls)} URLs.")
-    return scraped_data
+        yield {"event": "scraping_complete", "data": {"total_scraped": len(scraped_data)}}
+        print(f"✅ [SERVICES] Finished scraping. Successfully extracted content from {len(scraped_data)} out of {len(urls)} URLs.")
+
+        # --- NEW: YIELD the final scraped data ---
+        yield {"event": "scraping_data_complete", "data": {"scraped_data": scraped_data}}
 
 # thesys implementation 
 async def generate_ui_spec_from_markdown(markdown_content: str, context_package: Dict[str, Any]) -> str:
@@ -823,9 +850,14 @@ async def generate_and_stream_answer(
 
     try:
         full_markdown_response = ""
+        yield {"event": "analysis_complete", "data": {"path": path}}
         
         if path == "direct_answer":
             print("✅ [ORCHESTRATOR] Executing Direct Answer path.")
+            yield {"event": "synthesis_start", "data": {}}
+
+            yield {"event": "synthesis_start", "data": {}}
+
             yield {"event": "steps", "data": {"message": "Generating answer..."}}
             conversation_history = _format_context_for_prompt(context_package)
             direct_prompt = f"Conversation History:\n{conversation_history}\n\nUser's Question: {prompt}"
@@ -834,17 +866,24 @@ async def generate_and_stream_answer(
             for chunk in response_stream:
                 if chunk.text:
                     full_markdown_response += chunk.text
+                    
         else: # path == "search_required"
             print("✅ [ORCHESTRATOR] Executing Search/RAG path.")
             yield {"event": "steps", "data": {"message": "Generating search queries..."}}
             
-            queries = generate_search_queries(prompt, context_package)
+            queries = []
+            async for event in generate_search_queries(prompt, context_package):
+                if event['event'] == 'query_generated':
+                    yield event  # Stream to frontend
+                elif event['event'] == 'queries_complete':
+                    queries = event['data']['queries']  # Extract final list
+                elif event['event'] == 'error':
+                    yield event
+                    return
 
-            # Safety check: If query generation fails, stop here.
             if not queries:
                 yield {"event": "error", "data": {"message": "Failed to generate search queries."}}
                 return
-
             # Update the step message to reflect the parallel search
             # yield {"event": "steps", "data": {"message": "Searching for text and images..."}}
             for query in queries:
@@ -861,10 +900,16 @@ async def generate_and_stream_answer(
 
             # Await both tasks concurrently. This is the performance optimization.
             # `urls` will contain the result of the first task, `images` the second.
-            urls, images = await asyncio.gather(
-                text_urls_task,
-                image_results_task
-            )
+            # --- STAGE 3: URL RETRIEVAL ---
+            urls = []
+            async for event in get_urls_from_queries(queries):
+                if event['event'] == 'source_found':
+                    yield event  # Stream count to frontend
+                elif event['event'] == 'urls_complete':
+                    urls = event['data']['urls']  # Extract final list
+
+            # Still get images in parallel (no change needed here)
+            images = await _get_images_from_tavily_async(queries[0])
             print(f"✅ [ORCHESTRATOR] Parallel search complete. Found {len(urls)} text URLs and {len(images)} images.")
 
             # --- STEP 3: CREATE AND STREAM THE NEW "IMAGES" SSE EVENT ---
@@ -884,7 +929,14 @@ async def generate_and_stream_answer(
             # --- RESUME THE ORIGINAL FLOW ---
             # The rest of the code proceeds as before, using the `urls` variable.
             yield {"event": "steps", "data": {"message": f"Reviewing {len(urls)} sources..."}}
-            scraped_data = await scrape_urls_in_parallel(urls)
+            scraped_data = []
+            async for event in scrape_urls_in_parallel(urls):
+                if event['event'] == 'scraping_start':
+                    yield event  # Stream each domain to frontend
+                elif event['event'] == 'scraping_complete':
+                    yield event  # Stream completion
+                elif event['event'] == 'scraping_data_complete':
+                    scraped_data = event['data']['scraped_data']
 
             MIN_SOURCES_REQUIRED = 2
             if not scraped_data or len(scraped_data) < MIN_SOURCES_REQUIRED:
@@ -893,6 +945,7 @@ async def generate_and_stream_answer(
             sources_for_log = [{"title": url.split('/')[2].replace('www.', ''), "url": url} for url in urls]
             yield {"event": "sources", "data": {"sources": sources_for_log}}
             yield {"event": "steps", "data": {"message": "Synthesizing the final answer..."}}
+            yield {"event": "synthesis_start", "data": {}}
             async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
                 full_markdown_response += chunk
 
