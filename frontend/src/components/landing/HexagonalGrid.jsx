@@ -38,68 +38,56 @@ function HexagonalGrid() {
                 const x = col * hexHSpacing + hexSize;
                 const y = row * hexVSpacing + hexSize + (col % 2) * (hexVSpacing / 2);
                 
-                // --- CREATE TWO POLYGONS ---
                 const points = createHexagon(x, y);
 
                 // 1. The Visible Display Hexagon
                 const polygonDisplay = document.createElementNS(svgNS, 'polygon');
                 polygonDisplay.setAttribute('points', points);
                 polygonDisplay.setAttribute('class', 'hexagon-display');
-                // Give it a unique ID so the sensor can find it
-                const displayId = `hex-display-${row}-${col}`;
-                polygonDisplay.setAttribute('id', displayId);
-
-                // 2. The Invisible Sensor Hexagon
+                
+                // 2. The Invisible Sensor Hexagon for mouse events
                 const polygonSensor = document.createElementNS(svgNS, 'polygon');
                 polygonSensor.setAttribute('points', points);
                 polygonSensor.setAttribute('class', 'hexagon-sensor');
 
-                // --- ADD EVENT LISTENERS TO THE SENSOR ---
-                polygonSensor.addEventListener('mouseenter', function() {
-                    // Find the corresponding display hexagon
-                    const displayHex = document.getElementById(displayId);
-                    if (!displayHex) return;
+                // --- EVENT LISTENERS ---
 
-                    // Calculate movement
-                    const svgCenterX = width / 2;
-                    const svgCenterY = height / 2;
-                    const dx = x - svgCenterX;
-                    const dy = y - svgCenterY;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    const moveDistance = 15;
-                    const moveX = (dx / (distance || 1)) * moveDistance;
-                    const moveY = (dy / (distance || 1)) * moveDistance;
-                    
-                    // Animate the display hexagon
-                    displayHex.style.transform = `translate(${moveX}px, ${moveY}px) scale(1.1)`;
-                    displayHex.classList.add('is-hovered');
+                // When the mouse enters the invisible sensor...
+                polygonSensor.addEventListener('mouseenter', () => {
+                    // ...affect the visible display hexagon.
+                    // THE FIX: Only apply scale. No translate().
+                    polygonDisplay.style.transform = 'scale(1.15)';
+                    polygonDisplay.classList.add('is-hovered');
                 });
                 
-                polygonSensor.addEventListener('mouseleave', function() {
-                    // Find the corresponding display hexagon
-                    const displayHex = document.getElementById(displayId);
-                    if (!displayHex) return;
-
-                    // Reset the display hexagon
-                    displayHex.style.transform = 'translate(0, 0) scale(1)';
-                    displayHex.classList.remove('is-hovered');
+                // When the mouse leaves the invisible sensor...
+                polygonSensor.addEventListener('mouseleave', () => {
+                    // ...reset the visible display hexagon.
+                    polygonDisplay.style.transform = 'scale(1)';
+                    polygonDisplay.classList.remove('is-hovered');
                 });
                 
-                // Add both to the SVG. Display first, so Sensor is "on top" to catch clicks.
                 svg.appendChild(polygonDisplay);
-                svg.appendChild(polygonSensor);
+                svg.appendChild(polygonSensor); // Sensor on top to catch events
             }
         }
     }
 
-    drawGrid();
-    const debouncedDrawGrid = () => setTimeout(drawGrid, 100);
+    // --- EFFECT ORCHESTRATION ---
+    drawGrid(); // Initial draw
+
+    let resizeTimer;
+    const debouncedDrawGrid = () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(drawGrid, 100);
+    };
     window.addEventListener('resize', debouncedDrawGrid);
 
+    // Cleanup function
     return () => {
         window.removeEventListener('resize', debouncedDrawGrid);
     };
-}, []); // The empty array [] means this effect runs only once after the component mounts.
+}, []);
 
   return (
     <div className="hexagon-container">

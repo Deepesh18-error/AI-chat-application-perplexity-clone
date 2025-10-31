@@ -32,7 +32,7 @@ svg {
 
 .hexagon-display {
     fill: rgba(0, 0, 0, 0.01);
-    stroke: rgba(255, 255, 255, 0.05);
+    stroke: rgba(255, 255, 255, 0.10);
     stroke-width: 1;
     pointer-events: none; /* CRITICAL: This layer ignores the mouse */
     transform-origin: center;
@@ -54,6 +54,8 @@ svg {
     stroke-width: 1.5px;
     filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.5));
 }
+
+
 
 
 /* ========================================================================
