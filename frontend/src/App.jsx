@@ -9,6 +9,7 @@ import './index.css';
 import { v4 as uuidv4 } from 'uuid';
 import { HiGlobe, HiMicrophone } from 'react-icons/hi';
 import TextareaAutosize from 'react-textarea-autosize';
+import { TfiLayoutSidebarLeft } from "react-icons/tfi"; 
 
 
 function App() {
@@ -509,6 +510,7 @@ const newResponseState = {
           isOpen={isSidebarOpen} 
           onNewChat={handleNewChat}
           onSessionSelect={handleLoadSession}
+          toggleSidebar={toggleSidebar}
           currentSessionId={sessionId}
           sessions={sessions} // Pass the session list
           error={sessionsError}   // Pass any errors
@@ -518,7 +520,7 @@ const newResponseState = {
         <div className={`main-content ${isSidebarOpen ? 'sidebar-is-open' : ''}`}>
         {chatHistory.length > 0 && (
             <button onClick={toggleSidebar} className="sidebar-toggle-btn">
-              ☰
+              <TfiLayoutSidebarLeft />
             </button>
           )}
           <div className="chat-area"> {/* Renamed from response-area */}

@@ -2,6 +2,7 @@
 @import "@crayonai/react-ui/styles/index.css";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 
+
 :root {
   --background-color: #121212;
   --text-color: #e0e0e0;
@@ -228,15 +229,7 @@ body::-webkit-scrollbar-thumb:hover {
   background-color: var(--background-color);
 }
 
-.sidebar {
-  width: 280px;
-  background-color: #1a1a1a;
-  border-right: 1px solid var(--border-color);
-  flex-shrink: 0;
-  /* ADD THIS LINE to animate changes smoothly */
-  transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
-  overflow-x: hidden; /* Prevents content from spilling out during animation */
-}
+
 
 .main-content {
   flex-grow: 1;
@@ -302,44 +295,6 @@ body::-webkit-scrollbar-thumb:hover {
 /* --- SIDEBAR TOGGLE BUTTON --- */
 
 
-/* --- NEW CHAT BUTTON --- */
-.new-chat-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  width: 100%;
-  padding: 12px 15px;
-  border-radius: 8px;
-  text-align: left;
-  font-size: 15px;
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s ease-in-out;
-  margin-bottom: 20px;
-}
-
-.new-chat-btn:hover {
-  background-color: var(--container-bg);
-}
-
-.new-chat-icon {
-  display: flex;
-  align-items: center;
-  color: #a0a0a0; /* A slightly muted color for the icons */
-}
-
-.hamburger-icon {
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.plus-icon {
-  font-size: 16px;
-  font-weight: bold;
-  color: #8b5cf6; /* A purple/accent color for the plus */
-  margin-left: -4px; /* Nudge the plus icon closer to the hamburger */
-}
 
 /* --- SIDEBAR TOGGLE BUTTON (CORRECTED) --- */
 .sidebar-toggle-btn {
@@ -446,32 +401,6 @@ body::-webkit-scrollbar-thumb:hover {
   letter-spacing: 0.75px;
 }
 
-.chat-history-item {
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  width: 100%;  
-  padding: 10px 12px;
-  border-radius: 6px;
-  color: var(--text-color);
-  font-size: 14px;
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: background-color 0.2s ease;
-}
-
-.chat-history-item:hover {
-  background-color: var(--container-bg);
-}
-
-.chat-history-item.active {
-  background-color: var(--primary-color);
-  color: white;
-  font-weight: 500;
-}
 
 .no-history-text {
   font-size: 14px;
@@ -527,9 +456,9 @@ body::-webkit-scrollbar-thumb:hover {
 .delete-button {
   background: transparent;
   border: none;
-  color: #909090;
+  color: grey;
   cursor: pointer;
-  padding: 6px; /* A little padding to make it easier to click */
+  padding: 8px; /* A little padding to make it easier to click */
   border-radius: 6px;
   flex-shrink: 0; /* Prevent the button from shrinking */
 
@@ -553,7 +482,7 @@ body::-webkit-scrollbar-thumb:hover {
 /* A nice hover effect for the button itself */
 .delete-button:hover {
   background-color: rgba(255, 107, 107, 0.15); /* Subtle red background */
-  color: #ff8b8b; /* Red icon color */
+  color: #e26868; /* Red icon color */
 }
 
 
@@ -928,4 +857,180 @@ body::-webkit-scrollbar-thumb:hover {
 .expand-button:hover {
   opacity: 0.8;
   text-decoration: underline;
+}
+
+/* ======================================================================
+   FINAL SIDEBAR THEME (index.css)
+   ====================================================================== */
+
+/* --- 1. Main Sidebar Container --- */
+.sidebar {
+  background-color: #1a1a1a;
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+  transition: transform 0.3s ease-in-out, width 0.2s ease-in-out;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-content {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* --- 2. Sidebar Header & Toggle Button --- */
+.sidebar-header {
+  display: flex;
+  justify-content: space-between; /* Aligns title and toggle button */
+  align-items: center;
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #f0f0f0;
+  
+  /* --- NEW: Center the title --- */
+  flex-grow: 1; /* Allow the title to take up available space */
+  text-align: center;
+  /* Nudge it slightly left to visually center it against the button */
+  margin-left: -20px; 
+}
+
+
+.new-chat-btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* Remove justify-content: center to align left */
+  gap: 12px;
+  background-color: #2e2e2e;
+  
+  /* --- KEY STYLE CHANGES --- */
+  border: 1px solid #555; /* A much more subtle border */
+  border-radius: 8px; /* Standard rounded corners */
+  font-family: 'Inter', sans-serif; /* Revert to the default font */
+  font-size: 1rem; /* Standard font size */
+  font-weight: 500;
+  text-transform: none;
+  white-space: nowrap; /* CRITICAL: Prevents text from ever wrapping */
+  
+  color: var(--text-color);
+  width: 100%;
+  height: 48px; /* A standard, professional height */
+  padding: 0 15px; /* Standard padding */
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  box-sizing: border-box;
+}
+.new-chat-btn:hover {
+  background-color: #3f3f3f;
+  border-color: #777;
+}
+
+/* --- THE CORRECT WAY TO CONTROL THE '+' ICON --- */
+.new-chat-btn svg {
+  /* This now works because we are controlling the stroke */
+  font-size: 1.5rem; /* This sets the "canvas" size */
+  
+  /* 
+   * THE REAL FIX: This controls the THICKNESS of the plus lines.
+   * Increase this number (e.g., to 2) to make the plus thicker.
+   * Decrease it (e.g., to 0.5) to make it thinner.
+  */
+  stroke-width: 0.5;
+}
+
+
+/* --- 4. Section Title ('Chats') --- */
+.history-title {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 20px 10px 10px 10px; /* Add more space above */
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+}
+
+/* --- 5. Chat History Items --- */
+.chat-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: var(--text-color);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s, border-color 0.2s;
+  border: 1px solid transparent;
+}
+.chat-history-item:hover {
+  background-color:   rgb(50, 47, 47);
+}
+.chat-history-item.active {
+  background-color: #2e2e2e;
+  color: white;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+/* --- 6. The New Sidebar Toggle Icon Button --- */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 15px;
+  left: 15px; 
+  z-index: 1000;
+  background-color: #2e2e2e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 20px; /* Control the icon size */
+  line-height: 1;
+  display: flex; /* To center the icon */
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease-in-out;
+}
+.sidebar-toggle-btn:hover {
+  color: var(--text-color);
+  background-color: #3f3f3f;
+  border-color: #666;
+}
+.main-content.sidebar-is-open .sidebar-toggle-btn {
+  /* When the sidebar is open, the button should be INSIDE the sidebar header */
+  /* We will handle this with a structural change in the JSX */
+  display: none; /* Hide the absolute positioned one */
+}
+
+.sidebar-toggle-btn-internal {
+  /* Re-use the styles but without absolute positioning */
+  background-color: #2e2e2e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.sidebar-toggle-btn-internal:hover {
+  color: var(--text-color);
+  background-color: #3f3f3f;
+  border-color: #666;
 }

@@ -1,10 +1,14 @@
 // src/components/Sidebar.jsx - FINAL VERSION
 
 import React from 'react';
-import { BsTrash } from 'react-icons/bs'; // <--- 1. IMPORT THE ICON
+import { BsTrash } from 'react-icons/bs';
+import { BsPlusLg } from 'react-icons/bs';
+import { TfiLayoutSidebarLeft } from "react-icons/tfi";
+
+
 
 // ... (function signature remains the same)
-function Sidebar({ isOpen, onNewChat, onSessionSelect, currentSessionId, sessions, error, onSessionDelete }) {
+function Sidebar({ isOpen, onNewChat, onSessionSelect, currentSessionId, sessions, error, onSessionDelete , toggleSidebar, }) {
   // ... (sidebarClassName and handleDeleteClick function are unchanged)
   const sidebarClassName = `sidebar ${isOpen ? 'open' : 'closed'}`;
 
@@ -14,11 +18,21 @@ function Sidebar({ isOpen, onNewChat, onSessionSelect, currentSessionId, session
   };
 
   return (
-    <div className={sidebarClassName}>
+     <div className={sidebarClassName}>
       <div className="sidebar-content">
-        {/* ... (New Chat button and Chats title are unchanged) ... */}
+        {/* --- ADD THIS NEW HEADER SECTION --- */}
+        <div className="sidebar-header">
+          <h1>MEV</h1>
+          <button onClick={toggleSidebar} className="sidebar-toggle-btn-internal">
+            <TfiLayoutSidebarLeft />
+          </button>
+        </div>
+        {/* --- END OF NEW HEADER --- */}
+
+        {/* --- UPDATE THE NEW CHAT BUTTON --- */}
         <button className="new-chat-btn" onClick={onNewChat}>
-          ➕ New Chat
+          <BsPlusLg   /> {/* <-- Use the icon component */}
+          New Chat
         </button>
 
         <div className="chat-history-list">
