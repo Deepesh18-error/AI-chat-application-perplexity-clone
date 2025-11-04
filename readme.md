@@ -623,25 +623,22 @@ expand_less
 
 The frontend is built with a modular, component-based architecture.
 
-code
-Code
-download
-content_copy
-expand_less
-App.jsx
-├── Sidebar.jsx
-│   ├── New Chat Button
-│   └── Chat History List
-├── WelcomeScreen.jsx
-│   ├── StarField.jsx
-│   └── ArgonCore.jsx (Landing Page UI)
-└── Chat Area
-    └── ResponseContainer.jsx (1 per turn)
-        ├── User Prompt Bubble
-        └── ProcessingTimeline.jsx (Live View) or Tabbed Interface (Final View)
-            ├── C1Component (Answer Tab)
-            ├── SourceCard.jsx (Sources Tab)
-            └── ImageGrid.jsx (Images Tab)
+-   `App.jsx` (Root Component)
+    -   `Sidebar.jsx`
+        -   `New Chat Button`
+        -   `Chat History List`
+            -   `Delete Button` (on hover)
+    -   `WelcomeScreen.jsx` (Shown for new chats)
+        -   `StarField.jsx` (Animated background)
+        -   `ArgonCore.jsx` (Landing Page UI)
+    -   `Chat Area`
+        -   `ResponseContainer.jsx` (One for each turn in the conversation)
+            -   `User Prompt Bubble`
+            -   `ProcessingTimeline.jsx` (Displays during generation)
+            -   **Tabbed Interface** (Displays after completion)
+                -   `C1Component` (Renders the interactive "Answer" tab)
+                -   `SourceCard.jsx` (Used in the "Sources" tab)
+                -   `ImageGrid.jsx` (Used in the "Images" tab)
 
 App.jsx: The root component managing all major state (chat history, session ID, loading status) and handling the SSE stream processing.
 
@@ -702,7 +699,8 @@ To better visualize the internal workings of ARGON, the following diagrams illus
 Intelligent Routing Pipeline
 This diagram illustrates the sophisticated three-stage intelligent routing pipeline. This system is the "brain" that analyzes each user query to determine the most efficient and effective path for a response, deciding between a direct LLM answer and a full, web-augmented search. The flowchart shows the journey from initial, rapid metadata extraction to the final weighted decision.
 code
-Mermaid
+
+```mermaid
 %% This defines a Top-to-Down flowchart
 graph TD
 
@@ -728,10 +726,17 @@ graph TD
     %% Optional: Add styling to make it stand out
     style A fill:#1e1e1e,stroke:#fff,stroke-width:1px
     style H fill:#1e1e1e,stroke:#2ecc71,stroke-width:2px
-RAG Pipeline Data Flow
-This flowchart details the data transformation process within the Retrieval-Augmented Generation (RAG) pipeline, which is triggered when a web search is required. It visualizes the journey from raw, scraped web content through structured prompt construction, token-by-token synthesis by the LLM, and the final transformation into an interactive UI component via the Thesys API.
-code
-Mermaid
+
+#### Step 3: Fix the "RAG Pipeline" Diagram
+
+You have likely made the same mistake on the second diagram.
+
+1.  Find the section for the "RAG Pipeline Data Flow".
+2.  **Delete everything** from the line that starts with `...via the Thesys API. code Mermaid %%...` to the end of the styling line.
+3.  **In its place, copy and paste the entire block below:**
+
+```markdown
+```mermaid
 %% This defines a Top-to-Down flowchart
 graph TD
 
@@ -760,3 +765,4 @@ graph TD
 
     %% Style the final output node
     style G fill:#1e1e1e,stroke:#2ecc71,stroke-width:2px
+```
