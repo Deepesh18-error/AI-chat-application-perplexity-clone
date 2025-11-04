@@ -700,11 +700,12 @@ Intelligent Routing Pipeline
 This diagram illustrates the sophisticated three-stage intelligent routing pipeline. This system is the "brain" that analyzes each user query to determine the most efficient and effective path for a response, deciding between a direct LLM answer and a full, web-augmented search. The flowchart shows the journey from initial, rapid metadata extraction to the final weighted decision.
 code
 
+## 🧠 Intelligent Routing Pipeline
+
 ```mermaid
-%% This defines a Top-to-Down flowchart
+%% Top-to-Down flowchart
 graph TD
 
-    %% Define the nodes (boxes) with their text. Use <br/> for line breaks.
     A["User Query:<br/>'Who is the CEO of OpenAI?'"]
     B{"Stage 1: Metadata Extraction <br/>(0.5ms)"}
     C["has_attached_content: <b>False</b><br/>is_temporal: <b>False</b><br/>is_factual_lookup: <b>True ✅</b>"]
@@ -714,7 +715,6 @@ graph TD
     G["intent_type: factual_explanation (0.9)<br/>entity_dynamism: specific_person (0.9)<br/>verification_need: high (0.9)<br/><b>Final Score: 0.72 > 0.50</b>"]
     H["Path Decided:<br/><b>search_required ✅</b>"]
 
-    %% Link the nodes together with arrows
     A --> B
     B --> C
     C --> D
@@ -723,24 +723,16 @@ graph TD
     F --> G
     G --> H
 
-    %% Optional: Add styling to make it stand out
     style A fill:#1e1e1e,stroke:#fff,stroke-width:1px
     style H fill:#1e1e1e,stroke:#2ecc71,stroke-width:2px
+```
 
-#### Step 3: Fix the "RAG Pipeline" Diagram
 
-You have likely made the same mistake on the second diagram.
+## 🔄 RAG Pipeline Data Flow
 
-1.  Find the section for the "RAG Pipeline Data Flow".
-2.  **Delete everything** from the line that starts with `...via the Thesys API. code Mermaid %%...` to the end of the styling line.
-3.  **In its place, copy and paste the entire block below:**
-
-```markdown
 ```mermaid
-%% This defines a Top-to-Down flowchart
 graph TD
 
-    %% Define the nodes
     A[Scraped Content]
     C[Gemini Streaming Response]
     D["Token 1: 'The'<br/>Token 2: ' 2026'<br/>Token 3: ' FIFA'<br/>..."]
@@ -748,14 +740,12 @@ graph TD
     F(Thesys UI Transformation <br/> Markdown → C1 DSL)
     G(Interactive UI Component)
 
-    %% Use a subgraph to group the prompt construction steps
     subgraph B [Synthesis Prompt Construction]
         B1["<b>System Prompt:</b><br/>'You are a research assistant...<br/>Answer ONLY from these sources...'"]
         B2["<b>Context:</b><br/>[Source 1: fifa.com]...<br/>[Source 2: wiki.com]..."]
         B3["<b>User Query:</b><br/>'Tell me about 2026...'"]
     end
 
-    %% Link the nodes and the subgraph
     A --> B
     B --> C
     C --> D
@@ -763,6 +753,5 @@ graph TD
     E --> F
     F --> G
 
-    %% Style the final output node
     style G fill:#1e1e1e,stroke:#2ecc71,stroke-width:2px
 ```
