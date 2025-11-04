@@ -36,7 +36,6 @@ from .db_config import conversations_collection
 
 
 # Read the API key directly from the environment variable.
-# This is the most direct and reliable way.
 try:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -181,8 +180,6 @@ def extract_contextual_metadata(prompt: str) -> Dict[str, bool]:
 
 # NLP implementation 
 
-
-# Load the spaCy model once when the module is loaded for efficiency
 try:
     nlp = spacy.load("en_core_web_sm")
     print("✅ [CLASSIFIER STAGE 2] spaCy model 'en_core_web_sm' loaded successfully.")
@@ -190,7 +187,7 @@ except OSError:
     print("🚨 [CLASSIFIER STAGE 2] spaCy model not found. Please run 'python -m spacy download en_core_web_sm'")
     nlp = None
 
-# Define the programmatic mapping from LLM classifications to numerical scores
+# Defining the programmatic mapping from LLM classifications to numerical scores
 SCORE_MAPPING = {
     'intent_type': {
         'factual_explanation': 0.9,
@@ -230,7 +227,7 @@ def _get_linguistic_features(prompt: str) -> Dict[str, Any]:
     
     entities = [{'text': ent.text, 'label': ent.label_} for ent in doc.ents]
     
-    # Simple verb extraction (find the root verb of the main clause)
+    # Simple verb extraction
     root_verb = "unknown"
     for token in doc:
         if token.dep_ == "ROOT" and token.pos_ == "VERB":
@@ -357,7 +354,7 @@ CLASSIFIER_WEIGHTS = {
     'intent_type_score': 0.32,
     'entity_dynamism_score': 0.20,
     'temporal_urgency_score': 0.20,
-    # CRITICAL: This weight is NEGATIVE. High context dependency strongly
+    # This weight is NEGATIVE High context dependency strongly
     # penalizes the score, pushing it towards a direct answer.
     'context_dependency_score': -0.25, # Adjusted for stronger impact
     'verification_need_score': 0.18, # Slightly increased weight
@@ -475,11 +472,11 @@ You must respond with ONLY a valid JSON object with a single key "queries", cont
             
         generated_queries = response_json["queries"]
         
-        # --- CORRECTED LOGIC: YIELD each query individually ---
+        # LOGIC: YIELD each query individually 
         for query in generated_queries:
             yield {"event": "query_generated", "data": {"query": query}}
         
-        # --- NEW: YIELD the complete list as a special event ---
+        #  YIELD the complete list as a special event 
         yield {"event": "queries_complete", "data": {"queries": generated_queries}}
         
         print(f"✅ [SERVICES] Successfully generated and yielded queries: {generated_queries}")
@@ -504,7 +501,7 @@ async def _search_tavily_async(query: str) -> List[Dict[str, Any]]:
         print(f"  > Starting search for: '{query}'")
 
         # Get the Tavily API key directly from the environment variables.
-        # This is more direct and robust than using the Django settings object here.
+
         tavily_api_key = os.getenv("TAVILY_API_KEY")
         if not tavily_api_key:
             # If the key is not found, log an error and fail gracefully for this task.
@@ -513,10 +510,7 @@ async def _search_tavily_async(query: str) -> List[Dict[str, Any]]:
         
         # Initialize the Tavily client with the key.
         tavily_client = AsyncTavilyClient(api_key=tavily_api_key)
-        #  END OF FIX 
-        
-        # Use the async client's search method.
-        # We limit results to a reasonable number to avoid overwhelming the next stage.
+
         response = await tavily_client.search(
             query=query,
             search_depth="basic", # 'basic' is faster and sufficient for our needs
@@ -527,7 +521,7 @@ async def _search_tavily_async(query: str) -> List[Dict[str, Any]]:
         return response.get("results", [])
     except Exception as e:
         # If any other error occurs during a single Tavily search, we log it
-        # but return an empty list. This makes our parallel processing more resilient.
+
         print(f"  🚨 Error searching for '{query}': {e}")
         return []
 
@@ -544,7 +538,7 @@ async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
         A list of image result dictionaries from Tavily, or an empty list if an error occurs.
     """
     try:
-        # We add "IMAGE" to the log to clearly distinguish this from the text search.
+
         print(f"  > Starting IMAGE search for: '{query}'")
 
         tavily_api_key = os.getenv("TAVILY_API_KEY")
@@ -554,23 +548,21 @@ async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
         
         tavily_client = AsyncTavilyClient(api_key=tavily_api_key)
         
-        # The core of this function: make the API call with include_images=True
+        # The core of this function make the API call with include_images=True
         response = await tavily_client.search(
             query=query,
-            search_depth="basic",    # 'basic' is faster and sufficient for images.
-            include_images=True,     # The critical parameter to request image results.
-            max_results=15          # A reasonable limit for the number of images.
+            search_depth="basic",    
+            include_images=True,     
+            max_results=15          
         )
         
-        # Instead of "results", we extract the "images" key from the response.
-        # .get() is used for safety, returning [] if the "images" key is not found.
+
         images = response.get("images", [])
         
         print(f"  < Finished IMAGE search for: '{query}'. Found {len(images)} images.")
         return images
         
     except Exception as e:
-        # If any error occurs, log it and return an empty list to prevent crashes.
         print(f"  🚨 Error during IMAGE search for '{query}': {e}")
         return []
 
@@ -587,12 +579,12 @@ async def get_urls_from_queries(queries: List[str]) -> AsyncGenerator[Dict[str, 
     all_urls = []
     source_count = 0
 
-    # Use asyncio.as_completed to process tasks as they finish
+    # Using asyncio.as_completed to process tasks as they finish
     for future in asyncio.as_completed(tasks):
         results_from_one_query = await future
         urls_from_one_query = [result["url"] for result in results_from_one_query if "url" in result]
         
-        # As soon as we get URLs from one query, update the total count and yield
+        # As soon as we get URLs from one query update the total count and yield
         if urls_from_one_query:
             all_urls.extend(urls_from_one_query)
             source_count = len(all_urls) # A running total
@@ -627,7 +619,7 @@ async def _scrape_one_url(crawler: AsyncWebCrawler, url: str) -> Dict[str, str]:
     """
     print(f"  > Starting scrape for: {url}")
     try:
-        # The arun method is called with only the URL.
+
         # The library uses its own internal default timeouts.
         result = await crawler.arun(url=url)
         
@@ -661,15 +653,14 @@ async def scrape_urls_in_parallel(urls: List[str]) -> AsyncGenerator[Dict[str, A
     print(f"✅ [SERVICES] Starting parallel scrape for {len(urls)} URLs...")
 
     scraped_data = []
-    # Use a single crawler instance for all jobs for efficiency.
-    # The 'async with' block ensures the browser resources are cleaned up properly.
+
     async with AsyncWebCrawler() as crawler:
         #  1. Prepare the Tasks 
         tasks = []
         for url in urls:
             # Extract domain for the event
             domain = url.split('/')[2].replace('www.', '')
-            # --- NEW: YIELD event BEFORE starting scrape ---
+           
             yield {"event": "scraping_start", "data": {"domain": domain}}
             tasks.append(_scrape_one_url(crawler, url))
 
@@ -686,7 +677,7 @@ async def scrape_urls_in_parallel(urls: List[str]) -> AsyncGenerator[Dict[str, A
         yield {"event": "scraping_complete", "data": {"total_scraped": len(scraped_data)}}
         print(f"✅ [SERVICES] Finished scraping. Successfully extracted content from {len(scraped_data)} out of {len(urls)} URLs.")
 
-        # --- NEW: YIELD the final scraped data ---
+       
         yield {"event": "scraping_data_complete", "data": {"scraped_data": scraped_data}}
 
 # thesys implementation 
@@ -724,7 +715,6 @@ Use the conversation history to inform your design. For example, if this is a fo
         print(f"🚨 [THESYS] A critical error occurred during UI generation: {e}")
         return f"Error: An error occurred during UI generation: {str(e)}"
 
-# In services.py, replace the existing call_thesys_chat_api function
 
 async def call_thesys_chat_api(prompt: str):
     """
@@ -743,30 +733,28 @@ async def call_thesys_chat_api(prompt: str):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {"model": "c1-latest", "messages": [{"role": "user", "content": prompt}]}
 
-    # --- NEW LOGGING: Log the request we are sending ---
+
     print(f"    - Target URL: {api_url}")
     print(f"    - Authorization Header: Bearer ...{api_key[-4:]}") # Log last 4 chars for verification
     print(f"    - Payload Length Sent: {len(json.dumps(payload))} characters")
-    # Uncomment the next line ONLY for intense debugging, as it can be very long
-    # print(f"    - Full Payload Sent: {json.dumps(payload, indent=2)}")
-    # --- END OF NEW LOGGING ---
+
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(api_url, headers=headers, json=payload)
 
-            # --- CRITICAL LOGGING: Log the raw response BEFORE any parsing ---
+            
             raw_response_text = response.text
             print("\n    --- RECEIVED RESPONSE FROM THESYS ---")
             print(f"    - Status Code: {response.status_code}")
             print(f"    - Response Headers: {response.headers}")
             print(f"    - Raw Response Body: {raw_response_text}")
             print("    -------------------------------------\n")
-            # --- END OF CRITICAL LOGGING ---
+           
 
-            response.raise_for_status() # Still useful to catch 4xx/5xx errors
+            response.raise_for_status() 
 
-            # Now, attempt to parse the raw text we just logged
+            
             resp_json = json.loads(raw_response_text)
             message_content = resp_json.get("choices", [{}])[0].get("message", {}).get("content")
 
@@ -778,14 +766,14 @@ async def call_thesys_chat_api(prompt: str):
             return str(message_content), 200
 
     except httpx.HTTPStatusError as e:
-        # This will now have more context because we logged the body above
+        
         error_body = e.response.text
         print(f"🚨 [THESYS_API] HTTP Error Caught: {e.response.status_code}")
         print(f"   - Error Body from Exception: {error_body}")
         return json.dumps({"error": "Thesys API returned an error.", "details": error_body}), e.response.status_code
     
     except json.JSONDecodeError as e:
-        # This is the error we were seeing. Now we know exactly what text caused it.
+        
         print(f"🚨 [THESYS_API] JSON DECODE ERROR CAUGHT. The raw response body logged above is not valid JSON. Error: {e}")
         return json.dumps({"error": "Thesys returned a non-JSON response.", "details": raw_response_text}), 500
 
@@ -825,19 +813,14 @@ You are a world-class AI research assistant. Your purpose is to answer the user'
         f"user: {prompt}",
     ]
 
-    # 3. Select a powerful model for synthesis
+    
     model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
-    # 4. Initiate the streaming call and yield tokens
+   
     response_stream = model.generate_content(full_prompt, stream=True)
     for chunk in response_stream:
         if chunk.text:
             yield chunk.text
-
-
-# services.py
-
-# services.py
 
 async def generate_and_stream_answer(
     prompt: str, path: str, session_id: str, turn_number: int, context_package: Dict[str, Any]
@@ -885,56 +868,47 @@ async def generate_and_stream_answer(
                 yield {"event": "error", "data": {"message": "Failed to generate search queries."}}
                 return
             # Update the step message to reflect the parallel search
-            # yield {"event": "steps", "data": {"message": "Searching for text and images..."}}
+
             for query in queries:
                 yield {"event": "steps", "data": {"message": f"Searching for: \"{query}\""}}
 
-            # --- STEP 2: EXECUTE CONCURRENTLY WITH ASYNCIO.GATHER ---
-            # We select the first, most general query for the image search.
             image_search_query = queries[0] 
             print(f"✅ [ORCHESTRATOR] Starting parallel search. Image query: '{image_search_query}'")
 
-            # Create the two tasks to be run at the same time.
             text_urls_task = get_urls_from_queries(queries)
             image_results_task = _get_images_from_tavily_async(image_search_query)
 
-            # Await both tasks concurrently. This is the performance optimization.
-            # `urls` will contain the result of the first task, `images` the second.
-            # --- STAGE 3: URL RETRIEVAL ---
             urls = []
             async for event in get_urls_from_queries(queries):
                 if event['event'] == 'source_found':
-                    yield event  # Stream count to frontend
+                    yield event 
                 elif event['event'] == 'urls_complete':
-                    urls = event['data']['urls']  # Extract final list
+                    urls = event['data']['urls']  
 
-            # Still get images in parallel (no change needed here)
             images = await _get_images_from_tavily_async(queries[0])
             print(f"✅ [ORCHESTRATOR] Parallel search complete. Found {len(urls)} text URLs and {len(images)} images.")
 
-            # --- STEP 3: CREATE AND STREAM THE NEW "IMAGES" SSE EVENT ---
-            # This happens immediately after the images are fetched, before scraping.
+
             if images: # Only send the event if we actually found images.
                 print("✅ [ORCHESTRATOR] PREPARING TO STREAM 'images' EVENT.")
                 print(f"  > DATA BEING SENT: {json.dumps({'images': images}, indent=2)}")
-                # --- END OF DIAGNOSTIC LOG ---
+               
 
                 yield {"event": "images", "data": {"images": images}}
                 print("✅ [ORCHESTRATOR] 'images' event successfully yielded to stream.")
             else:
-                # --- NEW DIAGNOSTIC LOG FOR NO IMAGES ---
+               
                 print("🟡 [ORCHESTRATOR] No images found by Tavily. Skipping 'images' event.")
 
 
-            # --- RESUME THE ORIGINAL FLOW ---
-            # The rest of the code proceeds as before, using the `urls` variable.
+
             yield {"event": "steps", "data": {"message": f"Reviewing {len(urls)} sources..."}}
             scraped_data = []
             async for event in scrape_urls_in_parallel(urls):
                 if event['event'] == 'scraping_start':
-                    yield event  # Stream each domain to frontend
+                    yield event 
                 elif event['event'] == 'scraping_complete':
-                    yield event  # Stream completion
+                    yield event  
                 elif event['event'] == 'scraping_data_complete':
                     scraped_data = event['data']['scraped_data']
 
@@ -954,7 +928,6 @@ async def generate_and_stream_answer(
             raw_dsl_string = await generate_ui_spec_from_markdown(full_markdown_response, context_package)
             yield {"event": "aui_dsl", "data": raw_dsl_string}
 
-            # --- START OF DEFINITIVE FIX ---
 
             print("✅ [ORCHESTRATOR] Starting final metadata generation.")
             log_data = {}
@@ -968,41 +941,41 @@ async def generate_and_stream_answer(
                     _extract_entities(full_markdown_response)
                 )
                 
-                # --- CRITICAL DEBUGGING LOG ---
+                
                 print(f"    - Generated Title (for DB): '{title}'")
                 print(f"    - Generated Summary (for context): '{summary}'")
                 print(f"    - Generated Entities (for context): {entities}")
-                # --- END OF DEBUGGING LOG ---
+               
 
-                # This is what the frontend needs for this turn
+                
                 metadata_payload = {"summary": summary, "entities": entities}
                 yield {"event": "turn_metadata", "data": metadata_payload}
                 
-                # This is what gets saved to the database for this turn
+               
                 log_data = {
                     "session_id": session_id,
                     "turn_number": turn_number,
                     "user_query": prompt,
-                    "chat_title": title, # The new, permanent title for the session
-                    "response_summary": summary, # The summary for this specific turn's context
+                    "chat_title": title, 
+                    "response_summary": summary, 
                     "entities_mentioned": entities,
                     "full_response_spec": raw_dsl_string,
                     "sources_used": sources_for_log,
                     "execution_path": path,
                     "created_at": datetime.now(timezone.utc)
                 }
-            else: # For turn_number > 1
+            else: 
                 print(f"  > Turn {turn_number} detected. Generating summary for context only.")
-                # For subsequent turns, we ONLY need a summary and entities for context.
+                
                 summary, entities = await asyncio.gather(
                     _generate_summary(full_markdown_response),
                     _extract_entities(full_markdown_response)
                 )
 
-                # --- CRITICAL DEBUGGING LOG ---
+                
                 print(f"    - Generated Summary (for context): '{summary}'")
                 print(f"    - Generated Entities (for context): {entities}")
-                # --- END OF DEBUGGING LOG ---
+                
 
                 metadata_payload = {"summary": summary, "entities": entities}
                 yield {"event": "turn_metadata", "data": metadata_payload}
@@ -1020,14 +993,14 @@ async def generate_and_stream_answer(
                     "created_at": datetime.now(timezone.utc)
                 }
 
-            # --- DEBUG LOG BEFORE DB WRITE ---
+            # DEBUG LOG BEFORE DB WRITE
             print("  > Data prepared for database logging:")
             import pprint
             pprint.pprint(log_data)
-            # --- END OF DEBUG LOG ---
+            #  END OF DEBUG LOG 
 
             await _log_turn_to_db(log_data)
-            # --- END OF DEFINITIVE FIX ---
+            
 
         else:
             yield {"event": "error", "data": {"message": "Failed to generate a response."}}
@@ -1057,27 +1030,21 @@ async def stream_sse_formatter(
         sse_message = f"event: {event_name}\n"
 
         if event_name == "aui_dsl":
-            # For the multi-line DSL string, we split it by newline
-            # and prepend "data: " to each line.
+
             lines = payload.split('\n')
             for line in lines:
                 sse_message += f"data: {line}\n"
         else:
-            # For all other single-object events, we serialize to JSON.
+
             data_string = json.dumps(payload)
             sse_message += f"data: {data_string}\n"
             
-        # Terminate the message with an extra newline.
+        
         sse_message += "\n"
         
         yield sse_message
 
 
-# backend/api/services.py
-
-# ... after the _format_context_for_prompt function
-
-# --- NEW: Helper functions for Phase 3 ---
 
 async def _generate_summary(markdown_content: str) -> str:
     """Uses a fast LLM to generate a one-sentence summary of the response."""
@@ -1100,7 +1067,7 @@ async def _generate_summary(markdown_content: str) -> str:
         return summary
     except Exception as e:
         print(f"    - 🚨 Error generating summary: {e}")
-        return "A response was generated." # Return a generic fallback
+        return "A response was generated." 
 
 async def _extract_entities(markdown_content: str) -> List[str]:
     """Uses a fast LLM to extract key entities from the response."""
@@ -1129,8 +1096,7 @@ async def _extract_entities(markdown_content: str) -> List[str]:
         return entities
     except Exception as e:
         print(f"    - 🚨 Error extracting entities: {e}")
-        return [] # Return an empty list on failure
-# --- END OF NEW HELPERS ---
+        return [] 
 
 async def _generate_chat_title(user_query: str) -> str:
     """
@@ -1163,7 +1129,7 @@ async def _generate_chat_title(user_query: str) -> str:
         
     except Exception as e:
         print(f"    - 🚨 Error generating dedicated title: {e}")
-        # A smart fallback is to just use the user's query itself as the title.
+
         return user_query[:50]
     
 
@@ -1178,16 +1144,15 @@ async def _log_turn_to_db(log_data: dict):
         return
     
     try:
-        # Define the query to find the specific turn in the specific session
+
         query_filter = {
             "session_id": log_data["session_id"],
             "turn_number": log_data["turn_number"]
         }
 
-        # Define the data we want to set/update
+
         update_data = {"$set": log_data}
 
-        # Perform an update_one operation with upsert=True
         await conversations_collection.update_one(query_filter, update_data, upsert=True)
         
         print(f"✅ [DB_LOG] Successfully logged/updated turn {log_data['turn_number']} for session {log_data['session_id']}")

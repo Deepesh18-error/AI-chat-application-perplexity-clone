@@ -1,28 +1,29 @@
-import React, { useState } from 'react';
-import HexagonalGrid from './landing/HexagonalGrid';
+import React from 'react';
+import StarField from './landing/StarField';
 import ArgonCore from './landing/ArgonCore';
 import './WelcomeScreen.css';
 
-// The component now accepts all the props from App.jsx
-function WelcomeScreen({ onExampleClick, prompt, setPrompt, handleSubmit, isLoading, forceWebSearch, 
-  setForceWebSearch, isSpeechRecognitionSupported, isListening, handleMicClick }) {
-  // This state now lives in the parent and controls the entire screen's effect
-  const [isEnergized, setIsEnergized] = useState(false);
-
+function WelcomeScreen({ 
+  onExampleClick, 
+  prompt, 
+  setPrompt, 
+  handleSubmit, 
+  isLoading, 
+  forceWebSearch, 
+  setForceWebSearch, 
+  isSpeechRecognitionSupported, 
+  isListening, 
+  handleMicClick 
+}) {
   return (
-    // We apply the dynamic class here to affect the entire screen
-    <div className={`welcome-container ${isEnergized ? 'is-energized' : ''}`}>
-      <HexagonalGrid />
+    <div className="welcome-container">
+      <StarField />
       <ArgonCore 
-        // Pass down all the original props
         onExampleClick={onExampleClick}
         prompt={prompt}
         setPrompt={setPrompt}
         handleSubmit={handleSubmit}
         isLoading={isLoading}
-        // Pass the state setter function down so the child can control the parent's state
-        onFocusChange={setIsEnergized} 
-
         forceWebSearch={forceWebSearch}
         setForceWebSearch={setForceWebSearch}
         isSpeechRecognitionSupported={isSpeechRecognitionSupported}

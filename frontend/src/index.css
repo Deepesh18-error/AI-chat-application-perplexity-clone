@@ -1,4 +1,3 @@
-/* src/index.css */
 @import "@crayonai/react-ui/styles/index.css";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 
@@ -28,14 +27,14 @@ html, body {
   overflow-x: hidden; /* The key to hiding the horizontal scrollbar */
 }
 
-/* --- Step 2: Style the Main Vertical Scrollbar (Firefox) --- */
+
 body {
-  /* ... (your existing body styles like font-family, etc., remain) ... */
+
   scrollbar-width: thin;
   scrollbar-color: #4a4a4a transparent; /* Thumb color, then Track color */
 }
 
-/* --- Step 2: Style the Main Vertical Scrollbar (Chrome, Safari, Edge) --- */
+
 /* This targets the main scrollbar for the entire body */
 body::-webkit-scrollbar {
   width: 8px; /* A nice, slim width */
@@ -60,7 +59,6 @@ body::-webkit-scrollbar-thumb:hover {
   overflow-y: auto;
   padding: 20px;
   box-sizing: border-box;
-  /* --- ADD THE FIREFOX-SPECIFIC STYLES HERE --- */
   scrollbar-width: thin;                     /* Makes the scrollbar narrow in Firefox */
   scrollbar-color: #4a4a4a transparent;     /* Sets thumb and track color in Firefox */
   display: flex;
@@ -76,14 +74,13 @@ body::-webkit-scrollbar-thumb:hover {
   background: transparent; /* Makes the track invisible, matching your theme */
 }
 
-/* 2. The scrollbar thumb (the part you drag) */
+
 .chat-area::-webkit-scrollbar-thumb {
   background-color: #4a4a4a;    /* A dark grey that matches your UI */
   border-radius: 10px;          /* Gives it fully rounded corners */
   border: 2px solid var(--background-color); /* Creates a "padding" effect around the thumb */
 }
 
-/* 3. The thumb on hover (for user feedback) */
 .chat-area::-webkit-scrollbar-thumb:hover {
   background-color: #6b6b6b; /* A slightly lighter grey on hover */
 }
@@ -115,9 +112,6 @@ body::-webkit-scrollbar-thumb:hover {
   font-weight: 500;
   border-bottom: 2px solid transparent;
   transition: all 0.2s;
-
-  /* --- ADD THIS LINE --- */
-  /* This prevents "Sources · 7" from breaking into two lines */
   white-space: nowrap;
 }
 
@@ -130,40 +124,128 @@ body::-webkit-scrollbar-thumb:hover {
 @keyframes blink { 50% { opacity: 0; } }
 
 /* Source Cards */
-.sources-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
-.source-card { display: flex; align-items: center; gap: 12px; background-color: var(--input-bg); padding: 12px; border-radius: 8px; text-decoration: none; border: 1px solid transparent; transition: border-color 0.2s; }
+.sources-grid { 
+  display: grid; 
+  grid-template-columns: 
+  repeat(auto-fill, minmax(250px, 1fr)); 
+  gap: 15px; 
+}
+
+.source-card { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  background-color: var(--input-bg); 
+  padding: 12px; border-radius: 8px; 
+  text-decoration: none; 
+  border: 1px solid transparent; 
+  transition: border-color 0.2s; 
+}
+
 .source-card:hover { border-color: var(--primary-color); }
-.favicon { width: 24px; height: 24px; }
-.source-info { display: flex; flex-direction: column; overflow: hidden; }
-.source-title { color: var(--text-color); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.source-hostname { color: var(--text-muted); font-size: 12px; }
+.favicon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Source Info */
+.source-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.source-title {
+  color: var(--text-color);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-hostname {
+  color: var(--text-muted);
+  font-size: 12px;
+}
 
 /* Steps Timeline */
-.steps-timeline .step-item { position: relative; padding-left: 25px; margin-bottom: 12px; }
-.steps-timeline .step-item::before { content: '✓'; position: absolute; left: 0; top: 2px; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-.steps-timeline .step-item.done { color: var(--text-muted); }
-.steps-timeline .step-item.done::before { background-color: var(--border-color); color: #888; }
-.steps-timeline .step-item.current { color: var(--primary-color); }
-.steps-timeline .step-item.current::before { content: '●'; background-color: var(--primary-color); color: white; animation: pulse 1.5s infinite; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+.steps-timeline .step-item {
+  position: relative;
+  padding-left: 25px;
+  margin-bottom: 12px;
+}
+
+.steps-timeline .step-item::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.steps-timeline .step-item.done {
+  color: var(--text-muted);
+}
+
+.steps-timeline .step-item.done::before {
+  background-color: var(--border-color);
+  color: #888;
+}
+
+.steps-timeline .step-item.current {
+  color: var(--primary-color);
+}
+
+.steps-timeline .step-item.current::before {
+  content: '●';
+  background-color: var(--primary-color);
+  color: white;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
 
 /* Error Message */
-.error-message { margin-top: 15px; color: #ff8b8b; background-color: rgba(255, 107, 107, 0.1); padding: 12px; border-radius: 8px; border: 1px solid #ff8b8b; }
+.error-message {
+  margin-top: 15px;
+  color: #ff8b8b;
+  background-color: rgba(255, 107, 107, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ff8b8b;
+}
 
 
 .image-grid-container {
-  position: relative; /* This is CRITICAL for positioning the zoomed image */
+  position: relative; 
   padding-top: 16px;
   height: clamp(400px, 60vh, 700px);
 }
 
-/* --- The Grid Layout --- */
+/*  The Grid Layout  */
 .image-grid {
   display: grid;
   gap: 12px;
   width: 100%;
   height: 100%;
 }
+
 /* (Layouts for 3, 4, 5+ images are the same as before) */
 .image-grid.image-count-5 {
   grid-template-columns: repeat(6, 1fr);
@@ -177,7 +259,7 @@ body::-webkit-scrollbar-thumb:hover {
 .image-grid.image-count-4 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
 
 
-/* --- The Image Card & Its States --- */
+/*  The Image Card & Its States  */
 .image-card {
   border-radius: 12px;
   overflow: hidden;
@@ -190,13 +272,12 @@ body::-webkit-scrollbar-thumb:hover {
   object-fit: cover;
 }
 
-/* --- THE ZOOM EFFECT LOGIC --- */
 
 /* 1. When an image is selected, the overlay appears to catch clicks */
 .close-overlay {
   position: absolute;
   inset: 0;
-  z-index: 5; /* Below the selected image, but above the grid */
+  z-index: 5; 
 }
 
 /* 2. When an image is selected, fade and blur the grid items that are NOT selected */
@@ -220,7 +301,6 @@ body::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 10px 40px rgba(0,0,0,0.5);
 }
 
-/* --- NEW APPLICATION LAYOUT --- */
 
 .app-layout {
   display: flex;
@@ -235,12 +315,6 @@ body::-webkit-scrollbar-thumb:hover {
   flex-grow: 1;
   display: flex; /* It remains a flex container */
   flex-direction: column; /* To stack chat on top of prompt */
-  
-  /* 
-   * CRITICAL FIX: We use min-height instead of height.
-   * This allows the container to be AT LEAST the height of the screen,
-   * but it can GROW TALLER if the content inside is long.
-  */
   min-height: 100vh;
   
   max-width: 820px;
@@ -249,17 +323,8 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .chat-area {
-  /* 
-   * CRITICAL FIX: This makes the chat area expand to fill all
-   * available vertical space, pushing the prompt bar to the bottom.
-  */
   flex-grow: 1; 
-  
-  /* 
-   * CRITICAL FIX: We remove the internal scrolling.
-   * The content is now free to overflow this container.
-  */
-  overflow-y: visible; /* Or you can remove this line entirely */
+  overflow-y: visible; 
   
   padding: 20px;
   box-sizing: border-box;
@@ -272,11 +337,11 @@ body::-webkit-scrollbar-thumb:hover {
   border-top: 1px solid var(--border-color);
   background-color: var(--background-color);
   
-  /* A good practice to prevent this from shrinking */
+
   flex-shrink: 0;
 }
 
-/* --- COLLAPSIBLE SIDEBAR STYLES --- */
+/*  COLLAPSIBLE SIDEBAR STYLES  */
 
 /* Style for when the sidebar is OPEN (its default state) */
 .sidebar.open {
@@ -292,11 +357,11 @@ body::-webkit-scrollbar-thumb:hover {
   border-right: none; /* Hide border when closed */
 }
 
-/* --- SIDEBAR TOGGLE BUTTON --- */
+/*  SIDEBAR TOGGLE BUTTON  */
 
 
 
-/* --- SIDEBAR TOGGLE BUTTON (CORRECTED) --- */
+/*  SIDEBAR TOGGLE BUTTON   */
 .sidebar-toggle-btn {
   position: absolute;
   top: 15px;
@@ -326,7 +391,7 @@ body::-webkit-scrollbar-thumb:hover {
   left: calc(280px + 15px);
 }
 
-/* --- ENHANCED STEPS TIMELINE STYLES --- */
+/*  ENHANCED STEPS TIMELINE STYLES  */
 
 /* Base styles for all step items for consistent spacing */
 .steps-timeline .step-item {
@@ -381,7 +446,7 @@ body::-webkit-scrollbar-thumb:hover {
   font-size: 14px;
 }
 
-/* --- CHAT HISTORY LIST STYLES --- */
+/*  CHAT HISTORY LIST STYLES  */
 
 .chat-history-list {
   margin-top: 10px;
@@ -390,6 +455,28 @@ body::-webkit-scrollbar-thumb:hover {
   gap: 5px;
   overflow-y: auto; /* Allow history to scroll if it's long */
   flex-grow: 1; /* Take up remaining space in sidebar */
+  margin-right: -15px;  /* 1. Pull the container to the right edge, filling the parent's padding */
+  padding-right: 15px; /* 2. Push the content back in so text doesn't touch the new scrollbar */
+
+  scrollbar-width: thin;
+}
+
+.chat-history-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-history-list::-webkit-scrollbar-track {
+  background: transparent; /* Track is invisible */
+}
+
+.chat-history-list::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a;
+  border-radius: 10px;
+  border: 2px solid #1a1a1a;
+}
+
+.chat-history-list::-webkit-scrollbar-thumb:hover {
+  background-color: #6b6b6b;
 }
 
 .history-title {
@@ -419,7 +506,7 @@ body::-webkit-scrollbar-thumb:hover {
   line-height: 1.5;
 }
 
-/* --- SIDEBAR ERROR TEXT --- */
+/*  SIDEBAR ERROR TEXT  */
 .sidebar-error-text {
   font-size: 14px;
   color: #ff8b8b; /* A noticeable but not jarring red */
@@ -429,16 +516,13 @@ body::-webkit-scrollbar-thumb:hover {
   border-radius: 6px;
 }
 
-/* src/index.css - Add these new styles */
-
-/* --- DELETE BUTTON STYLES --- */
+/*  DELETE BUTTON STYLES  */
 
 .chat-history-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  /* This tells the browser to include padding in the element's total width */
   box-sizing: border-box; 
   width: 100%; /* Ensure it takes the full width of the sidebar */
 }
@@ -460,9 +544,7 @@ body::-webkit-scrollbar-thumb:hover {
   cursor: pointer;
   padding: 8px; /* A little padding to make it easier to click */
   border-radius: 6px;
-  flex-shrink: 0; /* Prevent the button from shrinking */
-
-  /* Center the icon perfectly inside the button */
+  flex-shrink: 0; 
   display: flex;
   align-items: center;
   justify-content: center;
@@ -512,8 +594,6 @@ body::-webkit-scrollbar-thumb:hover {
     resize: none;
     padding: 0;
     margin-bottom: 8px;
-
-    /* --- NEW SCROLLBAR STYLES FOR FIREFOX --- */
     scrollbar-width: thin;
     scrollbar-color: #4a4a4a var(--container-bg); /* Thumb color, Track color */
 }
@@ -557,13 +637,13 @@ body::-webkit-scrollbar-thumb:hover {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* --- The GLOW effect on focus --- */
+/*  The GLOW effect on focus  */
 .prompt-form:focus-within {
     border-color: #4a4a4a;
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
-/* --- 2. The Textarea --- */
+/*  2. The Textarea  */
 .prompt-textarea {
     flex-grow: 1;
     background: transparent;
@@ -579,7 +659,7 @@ body::-webkit-scrollbar-thumb:hover {
     outline: none;
 }
 
-/* --- 3. The Button Actions Bar --- */
+/*  3. The Button Actions Bar  */
 .prompt-actions-bar {
     display: flex;
     justify-content: space-between;
@@ -593,7 +673,7 @@ body::-webkit-scrollbar-thumb:hover {
     gap: 8px;
 }
 
-/* --- 4. The Action Icons (Globe & Mic) - CORRECTED --- */
+/*  4. The Action Icons (Globe & Mic) - CORRECTED  */
 .action-btn {
     background-color: #2e2e2e;
     color: grey;
@@ -627,9 +707,8 @@ body::-webkit-scrollbar-thumb:hover {
     border-color: skyblue;
 }
 
-/* --- 5. The Submit "Ask" Button - CORRECTED --- */
+/*  5. The Submit "Ask" Button - CORRECTED  */
 .submit-btn {
-    /* Default state when ENABLED (has text in box) */
     background-color: #3a3a3a;
     color: #b0b0b0;
     border: none;
@@ -656,8 +735,8 @@ body::-webkit-scrollbar-thumb:hover {
     margin-bottom: 40px; /* Vertical space between conversation turns */
 }
 
-/* --- 2. User Prompt Bubble --- */
-/* This gives the user's question a distinct, subtle container */
+/*  2. User Prompt Bubble  */
+
 .user-prompt {
     background-color: #1c1c1c; /* A slightly lighter shade than the main background */
     padding: 16px 20px;
@@ -667,7 +746,7 @@ body::-webkit-scrollbar-thumb:hover {
     font-size: 1.1rem;
 }
 
-/* --- 3. AI Response Container - THE CORE FIX --- */
+/*  3. AI Response Container - THE CORE FIX  */
 /* This implements the "invisible container" and "liberates" the content */
 .ai-response-container {
     /* Make the container itself invisible */
@@ -675,14 +754,10 @@ body::-webkit-scrollbar-thumb:hover {
     border: none;
     padding: 0;
     box-shadow: none;
-
-    /* CRITICAL: Liberate the content from scrolling constraints */
     overflow: visible; /* Prevents this element from having its own scrollbar */
     max-height: none;  /* Allows the content to be as tall as it needs */
 }
 
-/* --- Minor tweaks for the content inside the invisible container --- */
-/* We add a little padding to the tab content to align it nicely */
 .tab-content {
     padding-top: 20px;
     overflow: visible; /* Also prevent this from scrolling */
@@ -691,24 +766,15 @@ body::-webkit-scrollbar-thumb:hover {
 
 
 .ai-response-container.focused-view {
-  /* --- CRITICAL: This makes the container grow to fill all remaining vertical space --- */
   flex-grow: 1;
-
-  /* It needs to become a flex container for its own children (tabs and content) */
   display: flex;
   flex-direction: column;
-
-  /* Since it fills the screen, it needs a background color */
   background-color: var(--background-color); 
 }
 
-/* --- 3. Make the Tab Content Scrollable inside the Focused View --- */
-/* This transfers the scrolling responsibility to the tab-content area */
 .ai-response-container.focused-view .tab-content {
   flex-grow: 1; /* Allow the content area to expand */
-  overflow-y: auto; /* Enable scrolling for the content itself */
-  
-  /* Apply our custom scrollbar styles to this specific area */
+  overflow-y: auto; 
   scrollbar-width: thin;
   scrollbar-color: #4a4a4a transparent;
 }
@@ -729,11 +795,6 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .tabs button svg {
-  /* 
-   * CRITICAL FIX: We explicitly define the width and height.
-   * This forces every icon, regardless of its original design, into a
-   * perfectly uniform 16x16 pixel box, guaranteeing they all appear the same size.
-  */
   width: 18px;
   height: 18px;
 
@@ -744,9 +805,8 @@ body::-webkit-scrollbar-thumb:hover {
   flex-shrink: 0;
 }
 
-/* ======================================================================
-   PROCESSING TIMELINE STYLES (index.css)
-   ====================================================================== */
+/*
+   PROCESSING TIMELINE STYLES (index.css)*/
 
 .processing-timeline {
   position: relative;
@@ -827,11 +887,11 @@ body::-webkit-scrollbar-thumb:hover {
   margin: 8px 0 0 0;
 }
 
-/* ======================================================================
+/*
    TIMELINE UI ENHANCEMENTS (index.css)
-   ====================================================================== */
+   */
 
-/* --- The new bordered box style --- */
+/*  The new bordered box style  */
 .sub-item-box {
   margin-top: 12px;
   border: 1px solid #444; /* A slightly lighter grey border */
@@ -840,7 +900,7 @@ body::-webkit-scrollbar-thumb:hover {
   background-color: rgba(255, 255, 255, 0.02); /* A very subtle background tint */
 }
 
-/* --- Style for the "and X more..." button --- */
+/*  Style for the "and X more..." button  */
 .expand-button {
   background: none;
   border: none;
@@ -859,11 +919,11 @@ body::-webkit-scrollbar-thumb:hover {
   text-decoration: underline;
 }
 
-/* ======================================================================
+/* 
    FINAL SIDEBAR THEME (index.css)
-   ====================================================================== */
+    */
 
-/* --- 1. Main Sidebar Container --- */
+/*  1. Main Sidebar Container  */
 .sidebar {
   background-color: #1a1a1a;
   border-right: 1px solid var(--border-color);
@@ -872,6 +932,7 @@ body::-webkit-scrollbar-thumb:hover {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  overflow-y: hidden;
 }
 .sidebar-content {
   padding: 15px;
@@ -880,7 +941,7 @@ body::-webkit-scrollbar-thumb:hover {
   height: 100%;
 }
 
-/* --- 2. Sidebar Header & Toggle Button --- */
+/*  2. Sidebar Header & Toggle Button  */
 .sidebar-header {
   display: flex;
   justify-content: space-between; /* Aligns title and toggle button */
@@ -895,11 +956,8 @@ body::-webkit-scrollbar-thumb:hover {
   font-size: 1.5rem;
   font-weight: 600;
   color: #f0f0f0;
-  
-  /* --- NEW: Center the title --- */
   flex-grow: 1; /* Allow the title to take up available space */
   text-align: center;
-  /* Nudge it slightly left to visually center it against the button */
   margin-left: -20px; 
 }
 
@@ -908,11 +966,8 @@ body::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: row;
   align-items: center;
-  /* Remove justify-content: center to align left */
   gap: 12px;
   background-color: #2e2e2e;
-  
-  /* --- KEY STYLE CHANGES --- */
   border: 1px solid #0b0b0b; /* A much more subtle border */
   border-radius: 8px; /* Standard rounded corners */
   font-family: 'Inter', sans-serif; /* Revert to the default font */
@@ -936,18 +991,13 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .new-chat-btn svg {
-  /* Directly control the icon's bounding box for consistent size */
   width: 1rem;   /* e.g., 16px */
   height: 1rem;  /* e.g., 16px */
-  
-  /* Control the thickness of the '+' lines. '3' is a good, bold value. */
   stroke-width: 3; 
-
-  /* A good practice to prevent the icon from being squished */
   flex-shrink: 0;
 }
 
-/* --- 4. Section Title ('Chats') --- */
+/*  4. Section Title ('Chats')  */
 .history-title {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -957,7 +1007,7 @@ body::-webkit-scrollbar-thumb:hover {
   letter-spacing: 0.75px;
 }
 
-/* --- 5. Chat History Items --- */
+/*  5. Chat History Items  */
 .chat-history-item {
   display: flex;
   justify-content: space-between;
@@ -983,7 +1033,7 @@ body::-webkit-scrollbar-thumb:hover {
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
-/* --- 6. The New Sidebar Toggle Icon Button --- */
+/*  6. The New Sidebar Toggle Icon Button  */
 .sidebar-toggle-btn {
   position: absolute;
   top: 15px;
@@ -1008,8 +1058,6 @@ body::-webkit-scrollbar-thumb:hover {
   border-color: #666;
 }
 .main-content.sidebar-is-open .sidebar-toggle-btn {
-  /* When the sidebar is open, the button should be INSIDE the sidebar header */
-  /* We will handle this with a structural change in the JSX */
   display: none; /* Hide the absolute positioned one */
 }
 

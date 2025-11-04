@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BsCheckCircleFill, BsDot } from 'react-icons/bs';
-import { AiOutlineLoading3Quarters } from 'react-icons/ai'; // A good spinner icon
+import { AiOutlineLoading3Quarters } from 'react-icons/ai'; 
 
 // A small, reusable helper component for each step in the timeline
 const TimelineStep = ({ status, title, children }) => {
@@ -37,7 +37,7 @@ const ProcessingTimeline = ({ progress }) => {
 
   const { path, currentStage, queriesGenerated, sourcesFound, sourcesBeingScraped, totalScraped } = progress;
 
-  // --- NEW: Handle error state ---
+
   if (currentStage === 'error') {
     return (
       <div className="processing-timeline error-state">

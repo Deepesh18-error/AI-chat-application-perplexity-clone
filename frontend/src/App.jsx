@@ -1,10 +1,8 @@
-// src/App.jsx - RESTRUCTURED FOR NEW LAYOUT
-
 import { useState, useEffect, useRef } from 'react';
 import { ThemeProvider } from '@thesysai/genui-sdk';
 import ResponseContainer from './components/ResponseContainer';
 import WelcomeScreen from './components/WelcomeScreen';
-import Sidebar from './components/Sidebar'; // <-- STEP 1: Import the new component
+import Sidebar from './components/Sidebar'; 
 import './index.css';
 import { v4 as uuidv4 } from 'uuid';
 import { HiGlobe, HiMicrophone } from 'react-icons/hi';
@@ -31,7 +29,7 @@ function App() {
 
 
     useEffect(() => {
-    // --- START OF NEW SPEECH RECOGNITION LOGIC ---
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (SpeechRecognition) {
@@ -53,7 +51,7 @@ function App() {
             interimTranscript += transcript;
           }
         }
-        // Update the prompt state with the live transcription
+
         setPrompt(finalTranscript + interimTranscript);
       };
 
@@ -72,7 +70,7 @@ function App() {
     } else {
       setIsSpeechRecognitionSupported(false);
     }
-    // --- END OF NEW SPEECH RECOGNITION LOGIC ---
+
   }, []);
 
   useEffect(() => {
@@ -135,20 +133,19 @@ function App() {
     // Get the sessionId from the component's state for comparison
     const currentSessionIdFromState = sessionId;
 
-    // --- LOGIC CHECK 1: Don't do anything if no ID is provided ---
+
     if (!sessionIdToLoad) {
       console.warn("[SESSION] handleLoadSession called with no ID. Aborting.");
       return;
     }
 
-    // --- LOGIC CHECK 2: Don't reload if the requested session is already loaded ---
+
     if (sessionIdToLoad === currentSessionIdFromState) {
       console.log(`[SESSION] Session ${sessionIdToLoad} is already active. Closing sidebar.`);
       setIsSidebarOpen(false); // Just close the sidebar as a UX improvement
       return;
     }
 
-    // --- If checks pass, proceed with loading ---
     console.log(`[SESSION] Starting to load new session: ${sessionIdToLoad}`);
     setIsLoading(true);
     setChatHistory([]); // Clear the old chat
@@ -161,7 +158,6 @@ function App() {
       }
       const data = await response.json();
 
-      // --- CRITICAL STATE UPDATES ---
       setChatHistory(data);         // Load the new history
       setSessionId(sessionIdToLoad); // Set the new session as active
       
@@ -182,8 +178,6 @@ function App() {
     e.preventDefault();
     if (!prompt.trim() || isLoading) return;
 
-    // ... (Your entire handleSubmit logic remains UNCHANGED)
-    // No need to copy it here, it stays exactly the same.
     console.group(`🚀 [SUBMIT] New Request Started: "${prompt}"`);
     setIsLoading(true);
     const currentPrompt = prompt;
@@ -215,7 +209,6 @@ const newResponseState = {
     key: Date.now(),
     prompt: currentPrompt,
     
-    // --- NEW: The progress object to track the live timeline ---
     progress: {
       path: null,                    // 'direct_answer' or 'search_required'
       currentStage: 'analyzing',     // 'analyzing', 'searching', 'reading', 'synthesizing'
@@ -224,7 +217,6 @@ const newResponseState = {
       sourcesBeingScraped: [],       // To store domains as they are scraped
       totalScraped: 0,               // The final count of successfully scraped sources
     },
-    // --- End of new fields ---
     steps: [],
     sources: [],
     images: [],
@@ -344,8 +336,6 @@ const newResponseState = {
                 }
 
                 case 'urls_complete': {
-                // This event carries the final URL list from the backend.
-                    // We don't need to display it, but we acknowledge it.
                     console.log("  [STATE] URL retrieval complete.");
                     break;
                   }
@@ -370,8 +360,6 @@ const newResponseState = {
                 }
 
                 case 'scraping_data_complete': {
-                  // This event carries the final scraped data from the backend.
-                  // We don't need to display it, but we acknowledge it.
                   console.log("  [STATE] Scraping data complete.");
                   break;
                 }
@@ -385,8 +373,6 @@ const newResponseState = {
                 }
 
                 case 'queries_complete': {
-                // This event signals that all queries have been generated.
-                // We don't need to update the UI further, but we acknowledge the event.
                 console.log("  [STATE] All queries generated.");
                 break;
               }
@@ -424,7 +410,6 @@ const newResponseState = {
                           updatedState.summary = metadata.summary;
                           updatedState.entities = metadata.entities;
                           
-                          // --- CRITICAL FIX: Mark progress as complete ---
                           updatedState.progress = {
                             ...updatedState.progress,
                             currentStage: 'complete'
@@ -503,7 +488,7 @@ const newResponseState = {
 
   return (
     <ThemeProvider>
-      {/* STEP 2: The entire structure is replaced with the new layout */}
+      {}
       <div className={`app-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         {chatHistory.length > 0 && (
         <Sidebar 
@@ -538,11 +523,10 @@ const newResponseState = {
                 handleMicClick={handleMicClick}
               />
             ) : (
-              chatHistory.map((chat, index) => ( // <-- Add "index" to the map function
+              chatHistory.map((chat, index) => ( 
                 <div key={chat.key} className="turn-container">
                   <ResponseContainer 
                     response={chat} 
-                    // --- ADD THIS NEW PROP ---
                     isLastTurn={index === chatHistory.length - 1} 
                   />
                 </div>

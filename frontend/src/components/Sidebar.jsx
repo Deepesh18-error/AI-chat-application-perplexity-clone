@@ -1,15 +1,24 @@
-// src/components/Sidebar.jsx - FINAL VERSION
+import React, { useRef, useEffect } from 'react';
 
-import React from 'react';
 import { BsTrash } from 'react-icons/bs';
 import { BsPlusLg } from 'react-icons/bs';
 import { TfiLayoutSidebarLeft } from "react-icons/tfi";
 
-
-
-// ... (function signature remains the same)
 function Sidebar({ isOpen, onNewChat, onSessionSelect, currentSessionId, sessions, error, onSessionDelete , toggleSidebar, }) {
-  // ... (sidebarClassName and handleDeleteClick function are unchanged)
+
+  const chatListRef = useRef(null);
+
+  useEffect(() => {
+    // This effect will run every time the 'isOpen' prop changes.
+    // We only want to act when the sidebar OPENS.
+    if (isOpen && chatListRef.current) {
+      // If the sidebar is open and our ref is attached to the element,
+      // force its scroll position to the very top.
+      chatListRef.current.scrollTop = 0;
+    }
+  }, [isOpen]); // The dependency array ensures this runs only when 'isOpen' changes.
+
+
   const sidebarClassName = `sidebar ${isOpen ? 'open' : 'closed'}`;
 
   const handleDeleteClick = (e, sessionId) => {
@@ -20,22 +29,20 @@ function Sidebar({ isOpen, onNewChat, onSessionSelect, currentSessionId, session
   return (
      <div className={sidebarClassName}>
       <div className="sidebar-content">
-        {/* --- ADD THIS NEW HEADER SECTION --- */}
         <div className="sidebar-header">
           <h1>MEV</h1>
           <button onClick={toggleSidebar} className="sidebar-toggle-btn-internal">
             <TfiLayoutSidebarLeft />
           </button>
         </div>
-        {/* --- END OF NEW HEADER --- */}
-
-        {/* --- UPDATE THE NEW CHAT BUTTON --- */}
+        
         <button className="new-chat-btn" onClick={onNewChat}>
-          <BsPlusLg   /> {/* <-- Use the icon component */}
+          <BsPlusLg />
           New Chat
         </button>
 
-        <div className="chat-history-list">
+        {/*  STEP 4: Attach the ref to the scrollable div  */}
+        <div ref={chatListRef} className="chat-history-list">
           <h3 className="history-title">Chats</h3>
           
           {error ? (
@@ -54,7 +61,7 @@ function Sidebar({ isOpen, onNewChat, onSessionSelect, currentSessionId, session
                   onClick={(e) => handleDeleteClick(e, session.session_id)}
                   title="Delete chat"
                 >
-                  <BsTrash /> {/* <--- 2. USE THE ICON COMPONENT */}
+                  <BsTrash />
                 </button>
               </div>
             ))

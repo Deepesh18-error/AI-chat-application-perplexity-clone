@@ -1,5 +1,3 @@
-# backend/api/views.py - FINAL CORRECTED VERSION
-
 from django.http import StreamingHttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -8,9 +6,9 @@ from bson import ObjectId
 from datetime import datetime, timezone
 from .db_config import conversations_collection
 
-# --- THE CRITICAL FIX: IMPORT THE 'services' MODULE ---
+
 from . import services
-# --------------------------------------------------------
+
 
 from .db_config import conversations_collection
 
@@ -79,7 +77,6 @@ async def generate_view(request):
         traceback.print_exc() # Print full traceback to the console for debugging
         return JsonResponse({"error": "An internal server error occurred."}, status=500)
 
-# --- NEW CODE FOR CHAT HISTORY ---
 
 class ObjectIdEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -96,7 +93,7 @@ async def get_session_list(request):
     print("✅ [VIEW] Received request for session list.")
     
     try:
-        # Step 1: Fetch the initial data from MongoDB. This part of your code was correct.
+        
         pipeline = [
             {"$match": {"turn_number": 1}},
             {"$sort": {"created_at": -1}},
@@ -106,7 +103,6 @@ async def get_session_list(request):
         
         print(f"  > Found {len(sessions)} sessions from database.")
 
-        # Step 2: Safely process the titles. This is the corrected logic.
         for session in sessions:
             # Check if 'title' exists, is a string, and is not just empty spaces.
             if 'title' in session and isinstance(session.get('title'), str) and session['title'].strip():
@@ -142,7 +138,6 @@ async def get_session_history(request, session_id: str):
         formatted_history = []
         for doc in history_docs:
             
-            # --- START OF MODIFICATION ---
             
             # Default to a simple summary-based spec
             final_aui_spec = f"<C1><P>{doc.get('response_summary', 'No summary available.')}</P></C1>"
@@ -152,15 +147,14 @@ async def get_session_history(request, session_id: str):
             if full_spec and isinstance(full_spec, str) and full_spec.strip():
                 # If it does, use it instead of the summary
                 final_aui_spec = full_spec
-                
-            # --- END OF MODIFICATION ---
+
 
             formatted_history.append({
                 "key": str(doc['_id']),
                 "prompt": doc.get('user_query'),
                 "steps": ["Loaded from history"],
                 "sources": doc.get('sources_used', []),
-                "auiSpec": final_aui_spec, # <-- USE THE FINAL SPEC
+                "auiSpec": final_aui_spec,
                 "error": None,
                 "isLoading": False,
                 "summary": doc.get('response_summary'),
@@ -182,10 +176,8 @@ async def delete_session_view(request, session_id: str):
         if conversations_collection is None:
             return JsonResponse({"error": "Database not connected"}, status=500)
 
-        # The core command: delete all documents that match the session_id
         result = await conversations_collection.delete_many({"session_id": session_id})
         
-        # Log the outcome for debugging
         print(f"  > MongoDB operation complete. Deleted {result.deleted_count} documents.")
 
         if result.deleted_count > 0:
@@ -195,7 +187,7 @@ async def delete_session_view(request, session_id: str):
                 "deleted_count": result.deleted_count
             })
         else:
-            # This case handles if a session_id is provided that doesn't exist
+           
             return JsonResponse({
                 "status": "not_found",
                 "message": f"No session found with ID {session_id}"
@@ -205,8 +197,6 @@ async def delete_session_view(request, session_id: str):
         print(f"🚨 [DB] An error occurred during session deletion: {str(e)}")
         return JsonResponse({"error": "An internal server error occurred during deletion."}, status=500)
 
-
-# --- NEW FUNCTION 2: The URL Dispatcher ---
 @csrf_exempt
 @require_http_methods(["GET", "DELETE"]) # This view now accepts GET and DELETE
 async def session_detail_view(request, session_id: str):

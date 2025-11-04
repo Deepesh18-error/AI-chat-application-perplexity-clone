@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables from the .env file
 load_dotenv()
 
-# --- DATABASE CONFIGURATION ---
+# DATABASE CONFIGURATION 
 MONGO_CONNECTION_STRING = os.getenv("MONGO_CONNECTION_STRING")
 
 if not MONGO_CONNECTION_STRING:

@@ -1,5 +1,3 @@
-// src/components/ImageGrid.jsx - FINAL VERSION FOR IN-PLACE ZOOM
-
 import React, { useState } from 'react';
 
 function ImageGrid({ images }) {

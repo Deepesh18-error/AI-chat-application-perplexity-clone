@@ -21,12 +21,12 @@ const ResponseContainer = ({ response , isLastTurn  }) => {
 
   return (
     <div>
-      {/* --- 1. The User's Prompt Bubble --- */}
+      {/*  1. The User's Prompt Bubble  */}
       <div className="user-prompt">
         {response.prompt}
       </div>
 
-      {/* --- 2. The AI's Response Area --- */}
+      {/*  2. The AI's Response Area  */}
       <AnimatePresence mode="wait">
  {response.auiSpec && response.auiSpec.trim() && !response.error ? (
     // IF we have the final answer, render the answer view
@@ -39,7 +39,7 @@ const ResponseContainer = ({ response , isLastTurn  }) => {
       transition={{ duration: 0.4 }}
     >
           <div className={`ai-response-container ${isFocusedView ? 'focused-view' : ''}`}>
-            {/* --- Tabs Section --- */}
+            {/*  Tabs Section  */}
             <div className="tabs">
               <button
                 className={`tab ${activeTab === 'Answer' ? 'active' : ''}`}
@@ -76,7 +76,7 @@ const ResponseContainer = ({ response , isLastTurn  }) => {
               )}
             </div>
 
-            {/* --- Tab Content --- */}
+            {/*  Tab Content  */}
             <div className="tab-content">
               {activeTab === 'Answer' && <C1Component c1Response={response.auiSpec} />}
 

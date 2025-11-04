@@ -1,5 +1,3 @@
-// src/components/StepsTimeline.jsx - ENHANCED VERSION
-
 import React from 'react';
 
 function StepsTimeline({ steps, isLoading }) {
