@@ -326,29 +326,10 @@ const newResponseState = {
                   break;
                 }
 
-                case 'source_found': {
-                  const eventData = JSON.parse(reconstructedData);
-                  updatedState.progress = {
-                    ...updatedState.progress,
-                    sourcesFound: eventData.count
-                  };
-                  break;
-                }
-
                 case 'urls_complete': {
                     console.log("  [STATE] URL retrieval complete.");
                     break;
                   }
-
-                case 'scraping_start': {
-                  const eventData = JSON.parse(reconstructedData);
-                  updatedState.progress = {
-                    ...updatedState.progress,
-                    currentStage: 'reading',
-                    sourcesBeingScraped: [...updatedState.progress.sourcesBeingScraped, eventData.domain]
-                  };
-                  break;
-                }
 
                 case 'scraping_complete': {
                   const eventData = JSON.parse(reconstructedData);
@@ -359,11 +340,6 @@ const newResponseState = {
                   break;
                 }
 
-                case 'scraping_data_complete': {
-                  console.log("  [STATE] Scraping data complete.");
-                  break;
-                }
-
                 case 'synthesis_start': {
                   updatedState.progress = {
                     ...updatedState.progress,
@@ -371,6 +347,23 @@ const newResponseState = {
                   };
                   break;
                 }
+                
+                case 'source_retrieved': {
+                const eventData = JSON.parse(reconstructedData);
+                updatedState.progress = { 
+                  ...updatedState.progress, 
+                  currentStage: 'retrieving', // New unified stage
+                  sourcesRetrieved: eventData.count // Live counter for found+read sources
+                };
+                break;
+              }
+
+              case 'context_complete': {
+                // We no longer need a separate 'scraping_complete' case.
+                // This event tells the UI we have all the text ready.
+                console.log("  [STATE] Retrieval and Scraping complete.");
+                break;
+              }
 
                 case 'queries_complete': {
                 console.log("  [STATE] All queries generated.");

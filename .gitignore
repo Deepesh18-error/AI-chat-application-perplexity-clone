@@ -18,3 +18,9 @@ node_modules/
 
 # Vite build output folder (will be created later)
 dist/
+
+uvicorn core.asgi:application
+
+
+all_code.py
+project_code.txt

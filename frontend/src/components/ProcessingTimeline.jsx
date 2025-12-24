@@ -30,75 +30,51 @@ const TimelineStep = ({ status, title, children }) => {
 
 // The main timeline component
 const ProcessingTimeline = ({ progress }) => {
-  
   const [isReadingExpanded, setIsReadingExpanded] = useState(false);
-
   if (!progress) return null;
 
-  const { path, currentStage, queriesGenerated, sourcesFound, sourcesBeingScraped, totalScraped } = progress;
+  const { path, currentStage, queriesGenerated, sourcesRetrieved } = progress;
 
-
-  if (currentStage === 'error') {
-    return (
-      <div className="processing-timeline error-state">
-        <TimelineStep status="complete" title="Analysis complete" />
-        <TimelineStep status="error" title="An error occurred during processing" />
-      </div>
-    );
-  }
-
-  // Determine the status of each major stage
+  // 1. UPDATED STAGE LOGIC
   const analysisStatus = 'complete';
-  const searchStatus = currentStage === 'searching' ? 'active' : (currentStage !== 'analyzing' ? 'complete' : 'pending');
-  const readingStatus = currentStage === 'reading' ? 'active' : (currentStage === 'synthesizing' || currentStage === 'complete' ? 'complete' : 'pending');
-  const synthesisStatus = currentStage === 'synthesizing' ? 'active' : 'pending';
+  // Retrieval is active if we are 'searching' or 'retrieving'
+  const retrievalStatus = (currentStage === 'searching' || currentStage === 'retrieving') 
+    ? 'active' 
+    : (currentStage === 'synthesizing' || currentStage === 'complete' ? 'complete' : 'pending');
+  
+  const synthesisStatus = currentStage === 'synthesizing' ? 'active' : (currentStage === 'complete' ? 'complete' : 'pending');
 
   const isSearchPath = path === 'search_required';
 
   return (
     <div className="processing-timeline">
-      {/* --- Analysis Step --- */}
-      <TimelineStep status={analysisStatus} title={isSearchPath ? "Analyzing question" : "Understanding question"} />
+      <TimelineStep status={analysisStatus} title={isSearchPath ? "Analyzing your question" : "Understanding question"} />
 
-      {/* --- Search/Direct Path Steps --- */}
       {isSearchPath ? (
-        <>
-          <TimelineStep status={searchStatus} title="Searching the web">
-            {queriesGenerated.length > 0 && (
-              <div className="sub-item-box"> {/* <-- The new box container */}
-                <ul className="sub-item-list">
-                  {queriesGenerated.map((query, i) => <li key={i}>"{query}"</li>)}
-                </ul>
-              </div>
-            )}
-          </TimelineStep>
-
-          <TimelineStep status={readingStatus} title={readingStatus === 'complete' ? `Reviewed ${totalScraped} sources` : 'Reading sources'}>
-            {sourcesFound > 0 && <p className="sub-item-counter">Found {sourcesFound} potential sources...</p>}
-            {sourcesBeingScraped.length > 0 && (
-              <div className="sub-item-box"> {/* <-- The new box container */}
-                <ul className="sub-item-list reading-list">
-                  {/* Conditionally render all items or just the first 3 */}
-                  {(isReadingExpanded ? sourcesBeingScraped : sourcesBeingScraped.slice(0, 3)).map((domain, i) => (
-                    <li key={i}>Reading {domain}</li>
-                  ))}
-                </ul>
-                {/* The "Show More" button, which only appears if needed */}
-                {!isReadingExpanded && sourcesBeingScraped.length > 3 && (
-                  <button className="expand-button" onClick={() => setIsReadingExpanded(true)}>
-                    and {sourcesBeingScraped.length - 3} more...
-                  </button>
-                )}
-              </div>
-            )}
-          </TimelineStep>
-        </>
+        <TimelineStep 
+          status={retrievalStatus} 
+          title={retrievalStatus === 'complete' ? `Read ${sourcesRetrieved} sources` : "Retrieving information"}
+        >
+          {/* Show the search queries being used */}
+          {queriesGenerated.length > 0 && (
+            <div className="sub-item-box">
+              <ul className="sub-item-list">
+                {queriesGenerated.map((query, i) => <li key={i}>Searching for "{query}"...</li>)}
+              </ul>
+              {/* Show the live counter of sources retrieved in real-time */}
+              {sourcesRetrieved > 0 && (
+                <p className="sub-item-counter" style={{marginTop: '10px', color: '#3b82f6'}}>
+                  ✓ Found and processed {sourcesRetrieved} sources
+                </p>
+              )}
+            </div>
+          )}
+        </TimelineStep>
       ) : (
-        <TimelineStep status={synthesisStatus} title="Generating detailed response" />
+        <TimelineStep status={synthesisStatus} title="Processing direct answer" />
       )}
 
-      {/* --- Synthesis Step --- */}
-      <TimelineStep status={synthesisStatus} title={isSearchPath ? "Generating answer" : "Formatting your answer"} />
+      <TimelineStep status={synthesisStatus} title="Generating final answer" />
     </div>
   );
 };

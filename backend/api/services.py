@@ -34,6 +34,8 @@ from datetime import datetime, timezone
 from .db_config import conversations_collection
 
 
+import re
+
 
 # Read the API key directly from the environment variable.
 try:
@@ -291,7 +293,7 @@ You MUST respond with ONLY a valid JSON object with four keys.
     
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash", 
+            model_name="gemini-3-flash-preview", 
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(system_prompt)
@@ -443,7 +445,7 @@ async def generate_search_queries(prompt: str, context_package: Dict[str, Any]) 
             "response_mime_type": "application/json",
         }
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash", 
+            model_name="gemini-3-flash-preview", 
             generation_config=generation_config,
         )
 
@@ -485,46 +487,54 @@ You must respond with ONLY a valid JSON object with a single key "queries", cont
         print(f"🚨 [SERVICES] An error occurred while generating search queries: {e}")
         yield {"event": "error", "data": {"message": f"Failed to generate search queries: {e}"}}
 
+
+
+def _sanitize_raw_content(content: str, max_chars: int = 10000) -> str:
+    """
+    Cleans raw web content for LLM consumption.
+    """
+    if not content:
+        return ""
+
+    # 1. Remove common HTML-like artifacts if they leaked in
+    content = re.sub(r'<script.*?>.*?</script>', '', content, flags=re.DOTALL)
+    content = re.sub(r'<style.*?>.*?</style>', '', content, flags=re.DOTALL)
+    content = re.sub(r'<.*?>', '', content) # Strip any remaining tags
+
+    # 2. Normalize whitespace (Replace multiple newlines/tabs with a single space)
+    content = re.sub(r'\s+', ' ', content).strip()
+
+    # 3. Content Truncation (Protect the context window)
+    if len(content) > max_chars:
+        content = content[:max_chars] + "... [Content Truncated]"
+
+    return content
+
 # stage 3
 
 async def _search_tavily_async(query: str) -> List[Dict[str, Any]]:
-    """
-    An asynchronous helper function to perform a single search using the real Tavily API.
-    
-    Args:
-        query: The search query string.
+    tavily_api_key = os.getenv("TAVILY_API_KEY")
+    tavily_client = AsyncTavilyClient(api_key=tavily_api_key)
 
-    Returns:
-        A list of search result dictionaries from Tavily, or an empty list if an error occurs.
-    """
     try:
-        print(f"  > Starting search for: '{query}'")
-
-        # Get the Tavily API key directly from the environment variables.
-
-        tavily_api_key = os.getenv("TAVILY_API_KEY")
-        if not tavily_api_key:
-            # If the key is not found, log an error and fail gracefully for this task.
-            print("🚨 TAVILY_API_KEY not found in environment variables.")
-            return []
-        
-        # Initialize the Tavily client with the key.
-        tavily_client = AsyncTavilyClient(api_key=tavily_api_key)
-
-        response = await tavily_client.search(
+        # TRY 1: Advanced Search with Content
+        return (await tavily_client.search(
             query=query,
-            search_depth="basic", # 'basic' is faster and sufficient for our needs
-            max_results=5
-        )
-        
-        print(f"  < Finished search for: '{query}'")
-        return response.get("results", [])
+            search_depth="advanced",
+            max_results=6,
+            include_raw_content=True
+        )).get("results", [])
     except Exception as e:
-        # If any other error occurs during a single Tavily search, we log it
-
-        print(f"  🚨 Error searching for '{query}': {e}")
-        return []
-
+        print(f"⚠️ Advanced search failed for '{query}', falling back to basic: {e}")
+        try:
+            # TRY 2: Fallback to Basic (Faster, higher uptime)
+            return (await tavily_client.search(
+                query=query,
+                search_depth="basic",
+                max_results=5
+            )).get("results", [])
+        except:
+            return []
 
 async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
     """
@@ -567,118 +577,47 @@ async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
         return []
 
 
-async def get_urls_from_queries(queries: List[str]) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    (CORRECTED FOR LIVE STREAMING)
-    Fetches results concurrently and yields `source_found` events in real-time
-    as results come in.
-    """
-    print(f"✅ [SERVICES] Starting concurrent search for {len(queries)} queries...")
+async def get_full_context_from_queries(queries: List[str]) -> AsyncGenerator[Dict[str, Any], None]:
+    print(f"✅ [SERVICES] Starting Unified Retrieval for {len(queries)} queries...")
     tasks = [_search_tavily_async(query) for query in queries]
     
-    all_urls = []
-    source_count = 0
+    all_context = []
+    unique_sources = set()
 
-    # Using asyncio.as_completed to process tasks as they finish
     for future in asyncio.as_completed(tasks):
         results_from_one_query = await future
-        urls_from_one_query = [result["url"] for result in results_from_one_query if "url" in result]
         
-        # As soon as we get URLs from one query update the total count and yield
-        if urls_from_one_query:
-            all_urls.extend(urls_from_one_query)
-            source_count = len(all_urls) # A running total
-            yield {"event": "source_found", "data": {"count": source_count}}
-            
-    print(f"✅ [SERVICES] Found {len(all_urls)} total URLs (before de-duplication).")
+        # ... inside get_full_context_from_queries loop ...
+
+        for result in results_from_one_query:
+            url = result.get("url")
+            if url and url not in unique_sources:
+                raw_text = result.get("raw_content") or result.get("content", "")
+                
+                # APPLY PHASE 2 SANITIZATION
+                clean_text = _sanitize_raw_content(raw_text)
+
+                # APPLY USABILITY FILTER (200 char minimum)
+                if len(clean_text) > 200: 
+                    unique_sources.add(url)
+                    all_context.append({
+                        "source": url,
+                        "title": result.get("title", "Untitled Source"),
+                        "content": clean_text # Now using the cleaned, truncated text
+                    })
+                    yield {"event": "source_found", "data": {"count": len(all_context)}}
+                else:
+                    print(f"  ⚠️ Skipping {url}: Content too thin or poor quality.")
+
+    # Phase 1 Limitation: Ensure we don't pass TOO much data to Gemini yet
+    MAX_SOURCES = 6
+    final_context = all_context[:MAX_SOURCES]
     
-    unique_urls = list(dict.fromkeys(all_urls))
-    print(f"✅ [SERVICES] Found {len(unique_urls)} unique URLs.")
+    print(f"✅ [SERVICES] Retrieval Complete. {len(final_context)} sources ready for synthesis.")
 
-    MAX_URLS_TO_SCRAPE = 7
-    limited_urls = unique_urls[:MAX_URLS_TO_SCRAPE]
-    print(f"✅ [SERVICES] Limiting to {len(limited_urls)} URLs for scraping.")
+    # Yield the final data package to the orchestrator
+    yield {"event": "context_complete", "data": {"scraped_data": final_context}}
 
-    # Yield the final list of URLs to be used by the orchestrator
-    yield {"event": "urls_complete", "data": {"urls": limited_urls}}
-
-
-# stage 4
-async def _scrape_one_url(crawler: AsyncWebCrawler, url: str) -> Dict[str, str]:
-    """
-    An asynchronous helper function to perform a single scrape using the real Crawl4AI library.
-    This function is designed to be resilient.
-
-    Args:
-        crawler: An active instance of AsyncWebCrawler.
-        url: The URL to scrape.
-
-    Returns:
-        A dictionary containing the source URL and the scraped markdown content.
-        Returns an empty content string if scraping fails.
-    """
-    print(f"  > Starting scrape for: {url}")
-    try:
-
-        # The library uses its own internal default timeouts.
-        result = await crawler.arun(url=url)
-        
-        # Check if the crawler returned valid content
-        if result and result.markdown:
-            content_length = len(result.markdown)
-            print(f"  < Finished scrape for: {url} ({content_length} chars)")
-            return {"source": url, "content": result.markdown}
-        else:
-            print(f"  ? No content found for: {url}")
-            return {"source": url, "content": ""}
-            
-    except Exception as e:
-        # This will catch any errors from the crawl4ai library itself.
-        print(f"  🚨 Error scraping '{url}': {e}")
-        return {"source": url, "content": ""}
-
-
-async def scrape_urls_in_parallel(urls: List[str]) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    Takes a list of URLs and scrapes them all in parallel using Crawl4AI.
-    It then filters out failed or empty scrapes.
-
-    Args:
-        urls: A list of URL strings to scrape.
-
-    Returns:
-        A list of dictionaries, each containing the 'source' URL and its
-        'content' in Markdown format.
-    """
-    print(f"✅ [SERVICES] Starting parallel scrape for {len(urls)} URLs...")
-
-    scraped_data = []
-
-    async with AsyncWebCrawler() as crawler:
-        #  1. Prepare the Tasks 
-        tasks = []
-        for url in urls:
-            # Extract domain for the event
-            domain = url.split('/')[2].replace('www.', '')
-           
-            yield {"event": "scraping_start", "data": {"domain": domain}}
-            tasks.append(_scrape_one_url(crawler, url))
-
-        results = await asyncio.gather(*tasks)
-
-        #  3. Process and Filter Results 
-        for result in results:
-            # Check if the content is not empty or just whitespace.
-            if result and result.get("content", "").strip():
-                scraped_data.append(result)
-            else:
-                print(f"  - Discarding empty result for: {result.get('source')}")
-
-        yield {"event": "scraping_complete", "data": {"total_scraped": len(scraped_data)}}
-        print(f"✅ [SERVICES] Finished scraping. Successfully extracted content from {len(scraped_data)} out of {len(urls)} URLs.")
-
-       
-        yield {"event": "scraping_data_complete", "data": {"scraped_data": scraped_data}}
 
 # thesys implementation 
 async def generate_ui_spec_from_markdown(markdown_content: str, context_package: Dict[str, Any]) -> str:
@@ -695,6 +634,7 @@ You are a world-class UI/UX architect specializing in transforming text into int
 2. **Progressive Disclosure**: Show essential info first, hide complexity behind interactions
 3. **Visual Hierarchy**: Use size, color, and spacing to guide the eye
 4. **Scannable**: Users should grasp the structure in 2-3 seconds
+5. **Content Distillation**: The raw input may contain boilerplate or fragments. You MUST intelligently filter out irrelevant snippets and only render the core, high-value information into the UI components.
 
 === CONVERSATION CONTEXT ===
 {conversation_history}
@@ -786,7 +726,10 @@ async def call_thesys_chat_api(prompt: str):
 
     api_url = "https://api.thesys.dev/v1/embed/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {"model": "c1-latest", "messages": [{"role": "user", "content": prompt}]}
+    payload = {
+    "model": "c1/anthropic/claude-sonnet-4/v-20251130", 
+    "messages": [{"role": "user", "content": prompt}]
+}
 
 
     print(f"    - Target URL: {api_url}")
@@ -947,7 +890,7 @@ Professional but approachable. You're a knowledgeable colleague, not a formal re
     ]
 
     
-    model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+    model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
 
    
     response_stream = model.generate_content(full_prompt, stream=True)
@@ -960,9 +903,10 @@ async def generate_and_stream_answer(
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     The main orchestrator. Handles both Search/RAG and Direct Answer paths,
-    and uses Thesys to generate a final UI spec.
+    uses unified retrieval, and handles high-fidelity MongoDB logging for memory.
     """
-    sources_for_log = []
+    # Initialize as empty; will be populated if search is required
+    sources_for_log = [] 
 
     try:
         full_markdown_response = ""
@@ -970,173 +914,124 @@ async def generate_and_stream_answer(
         
         if path == "direct_answer":
             print("✅ [ORCHESTRATOR] Executing Direct Answer path.")
-            yield {"event": "synthesis_start", "data": {}}
-
-            yield {"event": "synthesis_start", "data": {}}
-
             yield {"event": "steps", "data": {"message": "Generating answer..."}}
+            
             conversation_history = _format_context_for_prompt(context_package)
             direct_prompt = f"Conversation History:\n{conversation_history}\n\nUser's Question: {prompt}"
-            model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+            
+            model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+            yield {"event": "synthesis_start", "data": {}}
+            
             response_stream = model.generate_content(direct_prompt, stream=True)
             for chunk in response_stream:
                 if chunk.text:
                     full_markdown_response += chunk.text
                     
         else: # path == "search_required"
-            print("✅ [ORCHESTRATOR] Executing Search/RAG path.")
+            print("✅ [ORCHESTRATOR] Executing Unified Search/Scrape path.")
             yield {"event": "steps", "data": {"message": "Generating search queries..."}}
             
             queries = []
             async for event in generate_search_queries(prompt, context_package):
                 if event['event'] == 'query_generated':
-                    yield event  # Stream to frontend
-                elif event['event'] == 'queries_complete':
-                    queries = event['data']['queries']  # Extract final list
-                elif event['event'] == 'error':
                     yield event
-                    return
+                elif event['event'] == 'queries_complete':
+                    queries = event['data']['queries']
 
             if not queries:
                 yield {"event": "error", "data": {"message": "Failed to generate search queries."}}
                 return
-            # Update the step message to reflect the parallel search
 
-            for query in queries:
-                yield {"event": "steps", "data": {"message": f"Searching for: \"{query}\""}}
+            # --- PHASE 3 & 5: UNIFIED RETRIEVAL ---
+            yield {"event": "steps", "data": {"message": f"Retrieving and reading sources..."}}
 
-            image_search_query = queries[0] 
-            print(f"✅ [ORCHESTRATOR] Starting parallel search. Image query: '{image_search_query}'")
+            # Start Image Search in background
+            image_task = asyncio.create_task(_get_images_from_tavily_async(queries[0]))
 
-            text_urls_task = get_urls_from_queries(queries)
-            image_results_task = _get_images_from_tavily_async(image_search_query)
-
-            urls = []
-            async for event in get_urls_from_queries(queries):
+            scraped_data = [] 
+            
+            # Use the Unified Fetcher (Phases 1 & 2)
+            async for event in get_full_context_from_queries(queries):
                 if event['event'] == 'source_found':
-                    yield event 
-                elif event['event'] == 'urls_complete':
-                    urls = event['data']['urls']  
-
-            images = await _get_images_from_tavily_async(queries[0])
-            print(f"✅ [ORCHESTRATOR] Parallel search complete. Found {len(urls)} text URLs and {len(images)} images.")
-
-
-            if images: # Only send the event if we actually found images.
-                print("✅ [ORCHESTRATOR] PREPARING TO STREAM 'images' EVENT.")
-                print(f"  > DATA BEING SENT: {json.dumps({'images': images}, indent=2)}")
-               
-
-                yield {"event": "images", "data": {"images": images}}
-                print("✅ [ORCHESTRATOR] 'images' event successfully yielded to stream.")
-            else:
-               
-                print("🟡 [ORCHESTRATOR] No images found by Tavily. Skipping 'images' event.")
-
-
-
-            yield {"event": "steps", "data": {"message": f"Reviewing {len(urls)} sources..."}}
-            scraped_data = []
-            async for event in scrape_urls_in_parallel(urls):
-                if event['event'] == 'scraping_start':
-                    yield event 
-                elif event['event'] == 'scraping_complete':
-                    yield event  
-                elif event['event'] == 'scraping_data_complete':
+                    # Signal frontend that a source is found and processed
+                    yield {"event": "source_retrieved", "data": event['data']}
+                elif event['event'] == 'context_complete':
                     scraped_data = event['data']['scraped_data']
 
-            MIN_SOURCES_REQUIRED = 2
-            if not scraped_data or len(scraped_data) < MIN_SOURCES_REQUIRED:
-                yield {"event": "error", "data": {"message": f"Could only retrieve content from {len(scraped_data)} sources."}}
+            images = await image_task
+            if images:
+                yield {"event": "images", "data": {"images": images}}
+
+            if not scraped_data:
+                yield {"event": "error", "data": {"message": "No usable information found."}}
                 return
-            sources_for_log = [{"title": url.split('/')[2].replace('www.', ''), "url": url} for url in urls]
-            yield {"event": "sources", "data": {"sources": sources_for_log}}
+
+            # --- PHASE 5: UPDATE SOURCE LOG TO INCLUDE CONTENT ---
+            # This is the critical change for RAG Memory
+            sources_for_log = [
+                {
+                    "title": item['title'], 
+                    "url": item['source'], 
+                    "content": item['content'] # <--- Storing full text for next turn
+                } for item in scraped_data
+            ]
+            
+            # Send simplified version to frontend (don't send raw content to browser)
+            sources_for_ui = [{"title": s['title'], "url": s['url']} for s in sources_for_log]
+            yield {"event": "sources", "data": {"sources": sources_for_ui}}
+
             yield {"event": "steps", "data": {"message": "Synthesizing the final answer..."}}
             yield {"event": "synthesis_start", "data": {}}
+
             async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
                 full_markdown_response += chunk
 
+        # --- AFTER ANSWER GENERATION: POST-PROCESSING ---
         if full_markdown_response.strip():
             yield {"event": "steps", "data": {"message": "Generating interactive UI..."}}
             raw_dsl_string = await generate_ui_spec_from_markdown(full_markdown_response, context_package)
             yield {"event": "aui_dsl", "data": raw_dsl_string}
 
-
-            print("✅ [ORCHESTRATOR] Starting final metadata generation.")
-            log_data = {}
-
+            print("✅ [ORCHESTRATOR] Generating session metadata.")
+            
+            # Generate Metadata in parallel for speed
             if turn_number == 1:
-                print("  > Turn 1 detected. Generating DEDICATED title and summary.")
-                # For the first turn, we generate everything: a title, a summary, and entities.
                 title, summary, entities = await asyncio.gather(
                     _generate_chat_title(prompt),
                     _generate_summary(full_markdown_response),
                     _extract_entities(full_markdown_response)
                 )
-                
-                
-                print(f"    - Generated Title (for DB): '{title}'")
-                print(f"    - Generated Summary (for context): '{summary}'")
-                print(f"    - Generated Entities (for context): {entities}")
-               
-
-                
-                metadata_payload = {"summary": summary, "entities": entities}
-                yield {"event": "turn_metadata", "data": metadata_payload}
-                
-               
-                log_data = {
-                    "session_id": session_id,
-                    "turn_number": turn_number,
-                    "user_query": prompt,
-                    "chat_title": title, 
-                    "response_summary": summary, 
-                    "entities_mentioned": entities,
-                    "full_response_spec": raw_dsl_string,
-                    "sources_used": sources_for_log,
-                    "execution_path": path,
-                    "created_at": datetime.now(timezone.utc)
-                }
-            else: 
-                print(f"  > Turn {turn_number} detected. Generating summary for context only.")
-                
+            else:
+                title = None
                 summary, entities = await asyncio.gather(
                     _generate_summary(full_markdown_response),
                     _extract_entities(full_markdown_response)
                 )
 
-                
-                print(f"    - Generated Summary (for context): '{summary}'")
-                print(f"    - Generated Entities (for context): {entities}")
-                
+            # Signal frontend that metadata is ready
+            yield {"event": "turn_metadata", "data": {"summary": summary, "entities": entities}}
+            
+            # --- PHASE 5: ASSEMBLE LOG DATA FOR MONGODB ---
+            log_data = {
+                "session_id": session_id,
+                "turn_number": turn_number,
+                "user_query": prompt,
+                "response_summary": summary, 
+                "entities_mentioned": entities,
+                "full_response_spec": raw_dsl_string,
+                "sources_used": sources_for_log, # This now includes 'content'
+                "execution_path": path,
+                "created_at": datetime.now(timezone.utc)
+            }
+            
+            if title:
+                log_data["chat_title"] = title
 
-                metadata_payload = {"summary": summary, "entities": entities}
-                yield {"event": "turn_metadata", "data": metadata_payload}
-                
-                log_data = {
-                    "session_id": session_id,
-                    "turn_number": turn_number,
-                    "user_query": prompt,
-                    # NO chat_title field for subsequent turns
-                    "response_summary": summary,
-                    "entities_mentioned": entities,
-                    "full_response_spec": raw_dsl_string,
-                    "sources_used": sources_for_log,
-                    "execution_path": path,
-                    "created_at": datetime.now(timezone.utc)
-                }
-
-            # DEBUG LOG BEFORE DB WRITE
-            print("  > Data prepared for database logging:")
-            import pprint
-            pprint.pprint(log_data)
-            #  END OF DEBUG LOG 
-
+            # Persist to DB
             await _log_turn_to_db(log_data)
             
-
         else:
-            yield {"event": "error", "data": {"message": "Failed to generate a response."}}
+            yield {"event": "error", "data": {"message": "Failed to generate a valid response."}}
 
     except Exception as e:
         import traceback
@@ -1183,7 +1078,7 @@ async def _generate_summary(markdown_content: str) -> str:
     """Uses a fast LLM to generate a one-sentence summary of the response."""
     print("  > [METADATA] Generating response summary...")
     try:
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
         prompt = f"""
         Analyze the following text, which is an AI-generated answer to a user's query.
         Your task is to create a very concise, one-sentence summary of the answer's main point.
@@ -1207,7 +1102,7 @@ async def _extract_entities(markdown_content: str) -> List[str]:
     print("  > [METADATA] Extracting key entities...")
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3-flash-preview",
             generation_config={"response_mime_type": "application/json"}
         )
         prompt = f"""
@@ -1238,7 +1133,7 @@ async def _generate_chat_title(user_query: str) -> str:
     """
     print("  > [METADATA] Generating DEDICATED chat title for new session...")
     try:
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
         
         prompt = f"""
         Analyze the user's initial query. Your task is to create a concise, 3-to-6-word, user-facing title for the conversation that is about to begin. The title should accurately represent the user's primary intent.
