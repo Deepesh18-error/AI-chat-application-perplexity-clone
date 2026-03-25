@@ -19,6 +19,8 @@ node_modules/
 # Vite build output folder (will be created later)
 dist/
 
+
+
 uvicorn core.asgi:application
 
 

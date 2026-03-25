@@ -178,6 +178,10 @@ function App() {
     e.preventDefault();
     if (!prompt.trim() || isLoading) return;
 
+    // 1. CAPTURE THE MOMENT YOU PRESSED ENTER
+    const uiClickTime = Date.now(); 
+    console.log(`⏱ [UI] 'Enter' pressed at: ${new Date(uiClickTime).toISOString()}`);
+
     console.group(`🚀 [SUBMIT] New Request Started: "${prompt}"`);
     setIsLoading(true);
     const currentPrompt = prompt;
@@ -205,27 +209,26 @@ function App() {
     console.log("  [CONTEXT] Assembled context package:", context_package);
 
 
-const newResponseState = {
-    key: Date.now(),
-    prompt: currentPrompt,
-    
-    progress: {
-      path: null,                    // 'direct_answer' or 'search_required'
-      currentStage: 'analyzing',     // 'analyzing', 'searching', 'reading', 'synthesizing'
-      queriesGenerated: [],          // To store the search query strings
-      sourcesFound: 0,               // A live counter for found sources
-      sourcesBeingScraped: [],       // To store domains as they are scraped
-      totalScraped: 0,               // The final count of successfully scraped sources
-    },
-    steps: [],
-    sources: [],
-    images: [],
-    auiSpec: null,
-    error: null,
-    summary: null,
-    entities: [],
-
-    isLoadedFromHistory: false,
+  const newResponseState = {
+      key: Date.now(),
+      prompt: currentPrompt,
+      progress: {
+        path: null,
+        currentStage: 'analyzing',
+        queriesGenerated: [],
+        sourcesFound: 0,
+        sourcesBeingScraped: [],
+        totalScraped: 0,
+      },
+      steps: [],
+      sources: [],
+      images: [],
+      auiSpec: null,
+      error: null,
+      summary: null,
+      entities: [],
+      streamingMarkdown: '',
+      isLoadedFromHistory: false,
   };
 
     setChatHistory(prev => [...prev, newResponseState]);
@@ -238,8 +241,11 @@ const newResponseState = {
         turn_number: chatHistory.length + 1,
         context_package: context_package,
         force_web_search: forceWebSearch,
+        client_start_time: uiClickTime
       };
       console.log("  [DEBUG] Payload being sent to backend:", requestPayload);
+
+      console.log(`⏱ [UI] 2. About to call fetch(): ${Date.now()}`);
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}generate/`, {
         method: 'POST',
@@ -247,6 +253,9 @@ const newResponseState = {
         body: JSON.stringify(requestPayload),
 
       });
+
+      console.log(`⏱ [UI] 3. Fetch call initiated: ${Date.now()}`);
+
       console.log("  [NETWORK] Initial response received from backend. Status:", response.status);
 
       if (!response.ok || !response.body) {
@@ -340,7 +349,33 @@ const newResponseState = {
                   break;
                 }
 
-                case 'synthesis_start': {
+              case 'markdown_chunk': {
+                  const eventData = JSON.parse(reconstructedData);
+                  const existingMarkdown = updatedState.streamingMarkdown || '';
+                  updatedState.streamingMarkdown = existingMarkdown + eventData.chunk;
+                  updatedState.progress = {
+                      ...updatedState.progress,
+                      currentStage: 'synthesizing'
+                  };
+                  // Unlock UI on very first chunk so user can type next question
+                  if (existingMarkdown.length === 0) {
+                      setIsLoading(false);
+                  }
+                  break;
+              }
+
+              case 'text_finished': {
+                  // Synthesis done, Thesys working in background
+                  // Keep streamingMarkdown visible, just update stage
+                  updatedState.progress = {
+                      ...updatedState.progress,
+                      currentStage: 'enhancing'
+                  };
+                  setIsLoading(false);  // Unlock input box now
+                  break;
+              }
+
+              case 'synthesis_start': {
                   updatedState.progress = {
                     ...updatedState.progress,
                     currentStage: 'synthesizing'
@@ -397,28 +432,22 @@ const newResponseState = {
                   break;
                 }
                 
-                 case 'turn_metadata': {
-                      try {
-                          const metadata = JSON.parse(reconstructedData);
-                          updatedState.summary = metadata.summary;
-                          updatedState.entities = metadata.entities;
-                          
-                          updatedState.progress = {
-                            ...updatedState.progress,
-                            currentStage: 'complete'
-                          };
-                          
-                          console.log("  [STATE] Received and stored turn metadata. Turn complete.", metadata);
-
-                          setIsLoading(false); 
-                          console.log("  [STATE] UI unlocked after receiving metadata.");
-
-                        } catch (e) {
-                          console.error("  [STATE] Failed to parse turn_metadata JSON:", e, reconstructedData);
-                          setIsLoading(false);
-                        }
-                        break;
-                      }
+                case 'turn_metadata': {
+                    try {
+                        const metadata = JSON.parse(reconstructedData);
+                        updatedState.summary = metadata.summary;
+                        updatedState.entities = metadata.entities;
+                        updatedState.progress = {
+                          ...updatedState.progress,
+                          currentStage: 'complete'
+                        };
+                        console.log("  [STATE] Turn metadata received. Complete.", metadata);
+                    } catch (e) {
+                        console.error("  [STATE] Failed to parse turn_metadata JSON:", e, reconstructedData);
+                        setIsLoading(false); // fallback unlock on parse error
+                    }
+                    break;
+                }
 
                 case 'finished':
                   break;
@@ -555,7 +584,7 @@ const newResponseState = {
                 <button
                   type="button"
                   className={`action-btn ${isListening ? 'active' : ''}`}
-                  oonClick={handleMicClick} 
+                  onClick={handleMicClick} 
                   title="Voice Input"
                 >
                   <HiMicrophone />

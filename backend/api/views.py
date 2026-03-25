@@ -5,7 +5,7 @@ import json
 from bson import ObjectId
 from datetime import datetime, timezone
 from .db_config import conversations_collection
-
+import time
 
 from . import services
 
@@ -14,10 +14,20 @@ from .db_config import conversations_collection
 
 @csrf_exempt
 @require_http_methods(["POST"])
+
 async def generate_view(request):
     print("\n--- [VIEW] Received new generation request ---")
     try:
+        entry_time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        print(f"\n--- [VIEW] Request Entered at: {entry_time} ---")
+        
+        server_entry_time = time.time() * 1000
+
         data = json.loads(request.body)
+
+        ui_click_time = data.get("ui_click_time", 0)
+
+
         prompt = data.get("prompt")
         session_id = data.get("session_id")
         turn_number = data.get("turn_number")
@@ -32,6 +42,10 @@ async def generate_view(request):
         print(f"✅ [VIEW] Prompt received: '{prompt[:100]}...'")
         print(f"  > Session ID: {session_id}, Turn: {turn_number}")
         
+        travel_time = server_entry_time - ui_click_time
+        print(f"\n--- [LATENCY REPORT] ---")
+        print(f"⏱ [NETWORK] UI -> Server Travel Time: {travel_time:.2f}ms")
+
         if turn_number == 1:
             print(f"  > First turn detected. Pre-creating session record in DB.")
             initial_session_doc = {
@@ -64,6 +78,8 @@ async def generate_view(request):
         response = StreamingHttpResponse(sse_stream, content_type='text/event-stream')
         response['X-Accel-Buffering'] = 'no'
         response['Cache-Control'] = 'no-cache'
+        response['Connection'] = 'keep-alive'
+        response['Transfer-Encoding'] = 'chunked'
         
         print("✅ [VIEW] Streaming response started.")
         return response

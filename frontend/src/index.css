@@ -1081,3 +1081,95 @@ body::-webkit-scrollbar-thumb:hover {
   background-color: #3f3f3f;
   border-color: #666;
 }
+
+
+/* ── STREAMING MARKDOWN ── */
+.streaming-markdown {
+  line-height: 1.7;
+  font-size: 16px;
+  color: var(--text-color);
+}
+
+.streaming-markdown p {
+  margin-bottom: 12px;
+  margin-top: 0;
+}
+
+.streaming-markdown h1,
+.streaming-markdown h2,
+.streaming-markdown h3 {
+  font-weight: 600;
+  margin: 20px 0 10px;
+  color: var(--text-color);
+}
+
+.streaming-markdown h2 { font-size: 1.3rem; }
+.streaming-markdown h3 { font-size: 1.1rem; }
+
+.streaming-markdown ul,
+.streaming-markdown ol {
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.streaming-markdown li {
+  margin-bottom: 6px;
+}
+
+.streaming-markdown code {
+  background: var(--input-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.streaming-markdown pre {
+  background: var(--input-bg);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.streaming-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.streaming-markdown blockquote {
+  border-left: 3px solid var(--primary-color);
+  padding-left: 12px;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+}
+
+.streaming-markdown strong {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.streaming-markdown a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.streaming-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* Blinking cursor at end of stream */
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background-color: var(--primary-color);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink-cursor 0.8s step-end infinite;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}

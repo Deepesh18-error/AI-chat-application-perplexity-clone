@@ -6,6 +6,7 @@ import StepsTimeline from './StepsTimeline';
 import { BsFileText, BsLink45Deg, BsCheck2Square, BsImages } from 'react-icons/bs';
 import ImageGrid from './ImageGrid';
 import ProcessingTimeline from './ProcessingTimeline';
+import StreamingMarkdown from './StreamingMarkdown';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -28,86 +29,104 @@ const ResponseContainer = ({ response , isLastTurn  }) => {
 
       {/*  2. The AI's Response Area  */}
       <AnimatePresence mode="wait">
- {response.auiSpec && response.auiSpec.trim() && !response.error ? (
-    // IF we have the final answer, render the answer view
-    <motion.div
-      key="answer-view"
-      variants={animationVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      transition={{ duration: 0.4 }}
-    >
-          <div className={`ai-response-container ${isFocusedView ? 'focused-view' : ''}`}>
-            {/*  Tabs Section  */}
-            <div className="tabs">
-              <button
-                className={`tab ${activeTab === 'Answer' ? 'active' : ''}`}
-                onClick={() => setActiveTab('Answer')}
-              >
-                <BsFileText /> Answer
-              </button>
+        {response.auiSpec && response.auiSpec.trim() && !response.error ? (
 
-              {response.sources?.length > 0 && (
+          /* ── STATE 3: Thesys done → show full C1 tabbed UI ── */
+          <motion.div
+            key="answer-view"
+            variants={animationVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.4 }}
+          >
+            <div className={`ai-response-container ${isFocusedView ? 'focused-view' : ''}`}>
+              <div className="tabs">
                 <button
-                  className={`tab ${activeTab === 'Sources' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('Sources')}
+                  className={`tab ${activeTab === 'Answer' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('Answer')}
                 >
-                  <BsLink45Deg /> Sources · {response.sources.length}
+                  <BsFileText /> Answer
                 </button>
-              )}
 
-              {response.images?.length > 0 && (
-                <button
-                  className={`tab ${activeTab === 'Images' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('Images')}
-                >
-                  <BsImages /> Images · {response.images.length}
-                </button>
-              )}
+                {response.sources?.length > 0 && (
+                  <button
+                    className={`tab ${activeTab === 'Sources' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('Sources')}
+                  >
+                    <BsLink45Deg /> Sources · {response.sources.length}
+                  </button>
+                )}
 
-              {response.steps && (
-                <button
-                  className={`tab ${activeTab === 'Steps' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('Steps')}
-                >
-                  <BsCheck2Square /> Steps
-                </button>
-              )}
+                {response.images?.length > 0 && (
+                  <button
+                    className={`tab ${activeTab === 'Images' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('Images')}
+                  >
+                    <BsImages /> Images · {response.images.length}
+                  </button>
+                )}
+
+                {response.steps && (
+                  <button
+                    className={`tab ${activeTab === 'Steps' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('Steps')}
+                  >
+                    <BsCheck2Square /> Steps
+                  </button>
+                )}
+              </div>
+
+              <div className="tab-content">
+                {activeTab === 'Answer' && <C1Component c1Response={response.auiSpec} />}
+                {activeTab === 'Sources' && (
+                  <div className="sources-grid">
+                    {response.sources.map((src, i) => (
+                      <SourceCard key={i} source={src} />
+                    ))}
+                  </div>
+                )}
+                {activeTab === 'Images' && <ImageGrid images={response.images} />}
+                {activeTab === 'Steps' && <StepsTimeline steps={response.steps} />}
+              </div>
             </div>
+          </motion.div>
 
-            {/*  Tab Content  */}
-            <div className="tab-content">
-              {activeTab === 'Answer' && <C1Component c1Response={response.auiSpec} />}
+        ) : response.streamingMarkdown ? (
 
-              {activeTab === 'Sources' && (
-                <div className="sources-grid">
-                  {response.sources.map((src, i) => (
-                    <SourceCard key={i} source={src} />
-                  ))}
-                </div>
-              )}
-
-              {activeTab === 'Images' && <ImageGrid images={response.images} />}
-
-              {activeTab === 'Steps' && <StepsTimeline steps={response.steps} />}
+          /* ── STATE 2: Synthesis streaming → show live markdown ── */
+          <motion.div
+            key="streaming-view"
+            variants={animationVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3 }}
+          >
+            <div className="ai-response-container">
+              <StreamingMarkdown
+                content={response.streamingMarkdown}
+                isStreaming={!response.auiSpec}
+              />
             </div>
-          </div>
-        </motion.div>
-      ) : (
-        // ELSE, if the answer is not ready, render the timeline
-        <motion.div
-          key="timeline-view"
-          variants={animationVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={{ duration: 0.4 }}
-        >
-          <ProcessingTimeline progress={response.progress} />
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </motion.div>
+
+        ) : (
+
+          /* ── STATE 1: Nothing yet → show processing timeline ── */
+          <motion.div
+            key="timeline-view"
+            variants={animationVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.4 }}
+          >
+            <ProcessingTimeline progress={response.progress} />
+          </motion.div>
+
+        )}
+      </AnimatePresence>
 
     </div>
   );
