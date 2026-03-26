@@ -953,12 +953,7 @@ Professional but approachable. You're a knowledgeable colleague, not a formal re
     model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
 
    
-    response_stream = await model.generate_content_async(
-            system_prompt,
-            stream=True
-        )
-        
-        # KEY CHANGE: async for instead of sync for
+    response_stream = await model.generate_content_async(full_prompt, stream=True)
     async for chunk in response_stream:
         if chunk.text:
             yield chunk.text
@@ -966,63 +961,6 @@ Professional but approachable. You're a knowledgeable colleague, not a formal re
     phase_end("synthesis")
 
 
-
-async def finalize_ui_and_metadata(
-    full_markdown: str, 
-    prompt: str, 
-    session_id: str, 
-    turn_number: int, 
-    context_package: Dict[str, Any], 
-    path: str, 
-    sources_for_log: List[Dict[str, Any]]
-) -> Tuple[str, str, List[str]]:
-    """
-    Handles the heavy background lifting: 
-    1. Thesys UI Generation (Slowest)
-    2. Summary & Entities (Parallel)
-    3. Final DB Logging
-    """
-    print("✅ [POST-PROCESS] Starting Thesys + Metadata in Parallel...")
-    
-    # 1. Start UI Generation and Metadata extraction in parallel
-    async def _run_metadata():
-        if turn_number == 1:
-            title, summary, entities = await asyncio.gather(
-                _generate_chat_title(prompt),
-                _generate_summary(full_markdown),
-                _extract_entities(full_markdown)
-            )
-            return title, summary, entities
-        else:
-            summary, entities = await asyncio.gather(
-                _generate_summary(full_markdown),
-                _extract_entities(full_markdown)
-            )
-            return None, summary, entities
-
-    # Await both major tasks
-    (ui_spec, (title, summary, entities)) = await asyncio.gather(
-        generate_ui_spec_from_markdown(full_markdown, context_package),
-        _run_metadata()
-    )
-
-    # 2. Log to Database (Async/Non-blocking)
-    log_data = {
-        "session_id": session_id,
-        "turn_number": turn_number,
-        "user_query": prompt,
-        "response_summary": summary,
-        "entities_mentioned": entities,
-        "full_response_spec": ui_spec,
-        "sources_used": sources_for_log,
-        "execution_path": path,
-        "created_at": datetime.now(timezone.utc)
-    }
-    if title: log_data["chat_title"] = title
-
-    await _log_turn_to_db(log_data)
-    
-    return ui_spec, summary, entities
 
 
 async def generate_and_stream_answer(
@@ -1056,80 +994,73 @@ async def generate_and_stream_answer(
             async for chunk in response_stream:
                 if chunk.text:
                     full_markdown_response += chunk.text
-                    yield {"event": "markdown_chunk", "data": {"chunk": chunk.text}}
-                    
-        else: # path == "search_required"
-            print("⚡ [ORCHESTRATOR] Executing FAST SEARCH path with Background Images.")
+
+        else:  # path == "search_required"
+            print("⚡ [ORCHESTRATOR] Executing FAST SEARCH path.")
             yield {"event": "steps", "data": {"message": "Searching the web..."}}
-            
-            phase_start("total_search_process")
 
-            # --- STEP 1: START IMAGE SEARCH IN BACKGROUND IMMEDIATELY ---
-            # We use the raw user prompt as the image query. 
-            # This runs while the text search is happening!
-
-            
+            # STEP 1: Start image search in background
             image_task = asyncio.create_task(_get_images_from_tavily_async(prompt))
-            print("Image Searching")
-            phase_end("total_search_process")
-            
 
-            # --- STEP 2: START FAST TAVILY TEXT SEARCH ---
+            # STEP 2: Fast Tavily text search
             tavily_response = await _search_tavily_async(prompt)
             tavily_results = tavily_response.get("results", [])
             tavily_instant_answer = tavily_response.get("answer")
 
-            # --- STEP 3: TIERED STREAMING (Instant Summary) ---
+            # STEP 3: Instant summary from Tavily
             if tavily_instant_answer:
                 yield {"event": "steps", "data": {"message": "Found quick results..."}}
                 instant_header = f"> **Quick Summary:** {tavily_instant_answer}\n\n---\n\n"
                 full_markdown_response += instant_header
                 yield {"event": "markdown_chunk", "data": {"chunk": instant_header}}
 
-            # --- STEP 4: HANDLE IMAGES (Wait for background task to finish) ---
-            # We check if the image task is done. If not, we await it briefly.
+            # STEP 4: Wait for images
             images = await image_task
             if images:
-                print(f"  🖼️ [ORCHESTRATOR] Found {len(images)} images in background.")
+                print(f"  🖼️ [ORCHESTRATOR] Found {len(images)} images.")
                 yield {"event": "images", "data": {"images": images}}
 
-            # Prepare snippets for synthesis
-            scraped_data = [{"source": res.get("url"), "title": res.get("title", "Untitled"), "content": res.get("content", "")} for res in tavily_results]
-            
-            # Send sources to UI
-            sources_for_ui = [{"title": s['title'], "url": s['source']} for s in scraped_data]
+            # STEP 5: Build scraped_data properly
+            scraped_data = [
+                {
+                    "source": res.get("url", ""),
+                    "title": res.get("title", "Untitled"),
+                    "content": res.get("content", "")
+                }
+                for res in tavily_results
+            ]
+
+            # Populate sources_for_log for DB
+            sources_for_log = [
+                {
+                    "title": item["title"],
+                    "url": item["source"],
+                    "content": item["content"]
+                }
+                for item in scraped_data
+            ]
+
+            # Send sources to UI — use "source" key which holds the url
+            sources_for_ui = [
+                {"title": item["title"], "url": item["source"]}
+                for item in scraped_data
+            ]
             yield {"event": "sources", "data": {"sources": sources_for_ui}}
 
-            phase_end("total_search_process")
-
-            # --- STEP 5: FINAL GEMINI SYNTHESIS ---
+            # STEP 6: Gemini synthesis
             yield {"event": "steps", "data": {"message": "Synthesizing full cited answer..."}}
             yield {"event": "synthesis_start", "data": {}}
 
-        # ── REAL-TIME STREAMING LOOP ──
             async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
                 if chunk:
                     full_markdown_response += chunk
                     yield {"event": "markdown_chunk", "data": {"chunk": chunk}}
 
-            # ── SYNTHESIS DONE — notify frontend ──
-            yield {"event": "text_finished", "data": {"message": "Draft complete."}}
-
-            # ── BACKGROUND HEAVY WORK ──
-            ui_spec, summary, entities = await finalize_ui_and_metadata(
-                full_markdown_response, prompt, session_id,
-                turn_number, context_package, path, sources_for_log
-            )
-
-            yield {"event": "aui_dsl", "data": ui_spec}
-            yield {"event": "turn_metadata", "data": {"summary": summary, "entities": entities}}
-
-        # --- AFTER ANSWER GENERATION: POST-PROCESSING ---
+        # ── POST-PROCESSING: runs for BOTH paths ──
         if full_markdown_response.strip():
             yield {"event": "steps", "data": {"message": "Generating interactive UI..."}}
             print("✅ [ORCHESTRATOR] Running Thesys + Metadata in PARALLEL...")
 
-            # --- INNER HELPERS FOR asyncio.gather ---
             async def _run_thesys():
                 return await generate_ui_spec_from_markdown(full_markdown_response, context_package)
 
@@ -1148,7 +1079,6 @@ async def generate_and_stream_answer(
                     )
                 return t, s, e
 
-            # BOTH RUN AT THE SAME TIME
             (raw_dsl_string, (title, summary, entities)) = await asyncio.gather(
                 _run_thesys(),
                 _run_metadata()
@@ -1170,7 +1100,6 @@ async def generate_and_stream_answer(
                 "execution_path": path,
                 "created_at": datetime.now(timezone.utc)
             }
-
             if title:
                 log_data["chat_title"] = title
 
@@ -1178,6 +1107,7 @@ async def generate_and_stream_answer(
 
         else:
             yield {"event": "error", "data": {"message": "Failed to generate a valid response."}}
+
             
     except Exception as e:
         import traceback

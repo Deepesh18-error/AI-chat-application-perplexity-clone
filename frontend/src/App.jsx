@@ -209,27 +209,27 @@ function App() {
     console.log("  [CONTEXT] Assembled context package:", context_package);
 
 
-  const newResponseState = {
-      key: Date.now(),
-      prompt: currentPrompt,
-      progress: {
-        path: null,
-        currentStage: 'analyzing',
-        queriesGenerated: [],
-        sourcesFound: 0,
-        sourcesBeingScraped: [],
-        totalScraped: 0,
-      },
-      steps: [],
-      sources: [],
-      images: [],
-      auiSpec: null,
-      error: null,
-      summary: null,
-      entities: [],
-      streamingMarkdown: '',
-      isLoadedFromHistory: false,
-  };
+const newResponseState = {
+    key: Date.now(),
+    prompt: currentPrompt,
+    progress: {
+      path: null,
+      currentStage: 'analyzing',
+      queriesGenerated: [],
+      sourcesFound: 0,
+      sourcesBeingScraped: [],
+      totalScraped: 0,
+    },
+    steps: [],
+    sources: [],
+    images: [],
+    auiSpec: null,
+    error: null,
+    summary: null,
+    entities: [],
+    streamingMarkdown: '',
+    isLoadedFromHistory: false,
+};
 
     setChatHistory(prev => [...prev, newResponseState]);
     console.log("  [STATE] Initial response object added to chat history.");
@@ -351,27 +351,11 @@ function App() {
 
               case 'markdown_chunk': {
                   const eventData = JSON.parse(reconstructedData);
-                  const existingMarkdown = updatedState.streamingMarkdown || '';
-                  updatedState.streamingMarkdown = existingMarkdown + eventData.chunk;
+                  updatedState.streamingMarkdown = (updatedState.streamingMarkdown || '') + eventData.chunk;
                   updatedState.progress = {
                       ...updatedState.progress,
                       currentStage: 'synthesizing'
                   };
-                  // Unlock UI on very first chunk so user can type next question
-                  if (existingMarkdown.length === 0) {
-                      setIsLoading(false);
-                  }
-                  break;
-              }
-
-              case 'text_finished': {
-                  // Synthesis done, Thesys working in background
-                  // Keep streamingMarkdown visible, just update stage
-                  updatedState.progress = {
-                      ...updatedState.progress,
-                      currentStage: 'enhancing'
-                  };
-                  setIsLoading(false);  // Unlock input box now
                   break;
               }
 
@@ -441,10 +425,11 @@ function App() {
                           ...updatedState.progress,
                           currentStage: 'complete'
                         };
-                        console.log("  [STATE] Turn metadata received. Complete.", metadata);
+                        setIsLoading(false);
+                        console.log("  [STATE] UI unlocked after receiving metadata.");
                     } catch (e) {
                         console.error("  [STATE] Failed to parse turn_metadata JSON:", e, reconstructedData);
-                        setIsLoading(false); // fallback unlock on parse error
+                        setIsLoading(false);
                     }
                     break;
                 }
