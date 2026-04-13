@@ -171,6 +171,7 @@ async def get_session_history(request, session_id: str):
                 "steps": ["Loaded from history"],
                 "sources": doc.get('sources_used', []),
                 "auiSpec": final_aui_spec,
+                "streamingMarkdown": doc.get('full_markdown_response', ''),
                 "error": None,
                 "isLoading": False,
                 "summary": doc.get('response_summary'),

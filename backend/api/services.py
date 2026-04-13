@@ -450,76 +450,6 @@ async def get_intelligent_path(prompt: str, context_package: Dict[str, Any]) -> 
 
 
 
-
-# stage 2
-async def generate_search_queries(prompt: str, context_package: Dict[str, Any]) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    (REFACTORED AS ASYNC GENERATOR - CORRECTED VERSION)
-    Yields `query_generated` events for each query, then yields a final
-    `queries_complete` event with the full list.
-    """
-    conversation_history = _format_context_for_prompt(context_package)
-
-    try:
-        phase_start("query_gen")
-
-        generation_config = {
-            "temperature": 0.2,
-            "top_p": 1,
-            "top_k": 1,
-            "max_output_tokens": 2048,
-            "response_mime_type": "application/json",
-        }
-        model = genai.GenerativeModel(
-            model_name="gemini-3-flash-preview", 
-            generation_config=generation_config,
-        )
-
-        system_prompt = f"""
-You are an expert search query generation assistant. Your goal is to decompose the user's question into 3 to 5 simple, effective search queries.
-
-**CRITICAL INSTRUCTION:** Analyze the provided conversation history. DO NOT generate queries for topics that have already been clearly answered or discussed. Focus your queries ONLY on the new information required by the user's latest question.
-
----
-**CONVERSATION HISTORY:**
-{conversation_history}
----
-**USER'S CURRENT QUESTION:**
-{prompt}
----
-
-You must respond with ONLY a valid JSON object with a single key "queries", containing a list of strings. Do not answer the question or add commentary.
-"""
-        
-        print(f"✅ [SERVICES] Sending prompt to Gemini for query generation: '{prompt}'")
-        response = model.generate_content(system_prompt)
-        response_json = json.loads(response.text)
-        
-        if "queries" not in response_json or not isinstance(response_json["queries"], list):
-            raise GeminiError("Invalid JSON: 'queries' key is missing or not a list.")
-            
-        generated_queries = response_json["queries"]
-        
-        phase_end("query_gen") 
-
-        # LOGIC: YIELD each query individually 
-        for query in generated_queries:
-            yield {"event": "query_generated", "data": {"query": query}}
-        
-        #  YIELD the complete list as a special event 
-        yield {"event": "queries_complete", "data": {"queries": generated_queries}}
-        
-        print(f"✅ [SERVICES] Successfully generated and yielded queries: {generated_queries}")
-
-    except Exception as e:
-
-        phase_end("query_gen") 
-
-        print(f"🚨 [SERVICES] An error occurred while generating search queries: {e}")
-        yield {"event": "error", "data": {"message": f"Failed to generate search queries: {e}"}}
-
-
-
 def _sanitize_raw_content(content: str, max_chars: int = 10000) -> str:
     """
     Cleans raw web content for LLM consumption.
@@ -766,72 +696,42 @@ Don't just format the markdown - REIMAGINE it as an interface. Ask yourself: "If
 
 async def call_thesys_chat_api(prompt: str):
     """
-    (ENHANCED DEBUGGING VERSION)
-    Acts as a secure proxy to the Thesys Chat Completions API.
-    Now includes extensive logging to debug the exact response.
+    Uses the official OpenAI client pointed at the Thesys endpoint.
+    This is the recommended approach per Thesys docs.
     """
-    print("  > [THESYS_API] Calling Thesys Chat Completions API (Debug Mode)...")
+    print("  > [THESYS_API] Calling Thesys via OpenAI-compatible client...")
     api_key = os.getenv("THESYS_API_KEY")
     if not api_key:
-        error_msg = "🚨 FATAL: THESYS_API_KEY not found."
-        print(error_msg)
+        print("🚨 FATAL: THESYS_API_KEY not found.")
         return json.dumps({"error": "Server API key not configured."}), 500
 
-    api_url = "https://api.thesys.dev/v1/embed/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-    "model": "c1/anthropic/claude-sonnet-4/v-20251130", 
-    "messages": [{"role": "user", "content": prompt}]
-}
-
-
-    print(f"    - Target URL: {api_url}")
-    print(f"    - Authorization Header: Bearer ...{api_key[-4:]}") # Log last 4 chars for verification
-    print(f"    - Payload Length Sent: {len(json.dumps(payload))} characters")
-
-
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(api_url, headers=headers, json=payload)
+        from openai import AsyncOpenAI
 
-            
-            raw_response_text = response.text
-            print("\n    --- RECEIVED RESPONSE FROM THESYS ---")
-            print(f"    - Status Code: {response.status_code}")
-            print(f"    - Response Headers: {response.headers}")
-            print(f"    - Raw Response Body: {raw_response_text}")
-            print("    -------------------------------------\n")
-           
+        client = AsyncOpenAI(
+            api_key=api_key,
+            base_url="https://api.thesys.dev/v1/embed"
+        )
 
-            response.raise_for_status() 
+        completion = await client.chat.completions.create(
+            model="c1/anthropic/claude-sonnet-4.6/v-20260331",  # ← UPGRADED MODEL
+            messages=[{"role": "user", "content": prompt}],
+        )
 
-            
-            resp_json = json.loads(raw_response_text)
-            message_content = resp_json.get("choices", [{}])[0].get("message", {}).get("content")
+        message_content = completion.choices[0].message.content
 
-            if message_content is None:
-                print("🚨 [THESYS_API] ERROR: 'message.content' field not found in the parsed JSON.")
-                return json.dumps({"error": "Invalid response structure from Thesys API."}), 500
+        if message_content is None:
+            print("🚨 [THESYS_API] ERROR: message content is None.")
+            return json.dumps({"error": "Empty response from Thesys."}), 500
 
-            # If we succeed, return the content
-            return str(message_content), 200
-
-    except httpx.HTTPStatusError as e:
-        
-        error_body = e.response.text
-        print(f"🚨 [THESYS_API] HTTP Error Caught: {e.response.status_code}")
-        print(f"   - Error Body from Exception: {error_body}")
-        return json.dumps({"error": "Thesys API returned an error.", "details": error_body}), e.response.status_code
-    
-    except json.JSONDecodeError as e:
-        
-        print(f"🚨 [THESYS_API] JSON DECODE ERROR CAUGHT. The raw response body logged above is not valid JSON. Error: {e}")
-        return json.dumps({"error": "Thesys returned a non-JSON response.", "details": raw_response_text}), 500
+        print(f"  ✅ [THESYS_API] Success. Response length: {len(message_content)} chars.")
+        return str(message_content), 200
 
     except Exception as e:
         print(f"🚨 [THESYS_API] Unexpected Error: {e}")
-        return json.dumps({"error": "Unexpected server error.", "details": str(e)}), 500#stage 5
-
+        return json.dumps({"error": "Unexpected server error.", "details": str(e)}), 500
+    
+    
 async def _synthesize_answer_from_context(
     prompt: str, scraped_data: List[Dict[str, str]], context_package: Dict[str, Any]
 ) -> AsyncGenerator[str, None]:
@@ -989,11 +889,13 @@ async def generate_and_stream_answer(
             
             yield {"event": "synthesis_start", "data": {}}
             
+            # These 4 lines MUST be indented inside the if block
             direct_model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
             response_stream = await direct_model.generate_content_async(direct_prompt, stream=True)
             async for chunk in response_stream:
                 if chunk.text:
                     full_markdown_response += chunk.text
+                    yield {"event": "markdown_chunk", "data": {"chunk": chunk.text}}
 
         else:  # path == "search_required"
             print("⚡ [ORCHESTRATOR] Executing FAST SEARCH path.")
@@ -1087,6 +989,7 @@ async def generate_and_stream_answer(
             print("✅ [ORCHESTRATOR] Thesys + Metadata both complete.")
 
             yield {"event": "aui_dsl", "data": raw_dsl_string}
+            await asyncio.sleep(0.1)
             yield {"event": "turn_metadata", "data": {"summary": summary, "entities": entities}}
 
             log_data = {
@@ -1098,7 +1001,8 @@ async def generate_and_stream_answer(
                 "full_response_spec": raw_dsl_string,
                 "sources_used": sources_for_log,
                 "execution_path": path,
-                "created_at": datetime.now(timezone.utc)
+                "created_at": datetime.now(timezone.utc),
+                "full_markdown_response": full_markdown_response
             }
             if title:
                 log_data["chat_title"] = title
@@ -1125,14 +1029,10 @@ async def generate_and_stream_answer(
         yield {"event": "finished", "data": {"message": "Stream completed."}}
 
 
+
 async def stream_sse_formatter(
     event_generator: AsyncGenerator[Dict[str, Any], None]
 ) -> AsyncGenerator[str, None]:
-    """
-    (CORRECT MULTI-LINE FORMATTER)
-    Wraps an async generator and formats its dictionary yields into
-    Server-Sent Event (SSE) strings. Correctly handles multi-line data.
-    """
     async for event in event_generator:
         event_name = event["event"]
         payload = event["data"]
@@ -1140,21 +1040,17 @@ async def stream_sse_formatter(
         sse_message = f"event: {event_name}\n"
 
         if event_name == "aui_dsl":
-
             lines = payload.split('\n')
             for line in lines:
                 sse_message += f"data: {line}\n"
         else:
-
             data_string = json.dumps(payload)
             sse_message += f"data: {data_string}\n"
             
-        
         sse_message += "\n"
-        
         yield sse_message
-
-
+        await asyncio.sleep(0)
+        
 
 async def _generate_summary(markdown_content: str) -> str:
     """Uses a fast LLM to generate a one-sentence summary of the response."""

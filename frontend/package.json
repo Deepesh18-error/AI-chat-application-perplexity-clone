@@ -10,15 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@crayonai/react-core": "^0.7.6",
-    "@crayonai/react-ui": "^0.8.31",
-    "@thesysai/genui-sdk": "^0.6.34",
+    "@crayonai/react-core": "^0.7.7",
+    "@crayonai/react-ui": "^0.9.16",
+    "@thesysai/genui-sdk": "^0.9.1",
     "framer-motion": "^12.23.24",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^5.5.0",
     "react-markdown": "^9.1.0",
     "react-textarea-autosize": "^8.5.9",
+    "remark-gfm": "^4.0.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
