@@ -58,7 +58,7 @@
   margin-top: 0;
 }
 
-/* --- Tab Styles --- */
+
 .tabs {
   display: flex;
   border-bottom: 1px solid var(--border-color);
@@ -80,7 +80,7 @@
   border-bottom: 2px solid var(--primary-color);
 }
 
-/* --- Sources List --- */
+
 .sources-list ul {
   list-style: none;
   padding: 0;

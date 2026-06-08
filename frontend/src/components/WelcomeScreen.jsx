@@ -1,4 +1,3 @@
-import React from 'react';
 import StarField from './landing/StarField';
 import ArgonCore from './landing/ArgonCore';
 import './WelcomeScreen.css';
@@ -13,7 +12,8 @@ function WelcomeScreen({
   setForceWebSearch, 
   isSpeechRecognitionSupported, 
   isListening, 
-  handleMicClick 
+  handleMicClick,
+  user
 }) {
   return (
     <div className="welcome-container">
@@ -29,6 +29,7 @@ function WelcomeScreen({
         isSpeechRecognitionSupported={isSpeechRecognitionSupported}
         isListening={isListening}
         handleMicClick={handleMicClick}
+        user={user}
       />
     </div>
   );

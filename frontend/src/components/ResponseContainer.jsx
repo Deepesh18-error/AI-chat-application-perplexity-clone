@@ -1,33 +1,34 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { C1Component } from '@thesysai/genui-sdk';
+import { BsExclamationTriangle, BsFileText, BsLink45Deg, BsCheck2Square, BsImages, BsStars } from 'react-icons/bs';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import SourceCard from './SourceCard';
 import StepsTimeline from './StepsTimeline';
-import { BsFileText, BsLink45Deg, BsCheck2Square, BsImages, BsStars } from 'react-icons/bs';
 import ImageGrid from './ImageGrid';
 import ProcessingTimeline from './ProcessingTimeline';
 import StreamingMarkdown from './StreamingMarkdown';
-import { motion, AnimatePresence } from 'framer-motion';
 
-const ResponseContainer = ({ response, isLastTurn }) => {
+const MotionDiv = motion.div;
+
+const ResponseContainer = ({ response }) => {
   const [activeTab, setActiveTab] = useState('Answer');
 
   const hasContent = response.streamingMarkdown || response.auiSpec;
-  const isStreaming = response.streamingMarkdown && 
-  response.progress?.currentStage === 'synthesizing' && 
-  !response.isLoadedFromHistory;
+  const warnings = response.providerWarnings || [];
+  const isStreaming = response.streamingMarkdown
+    && response.progress?.currentStage === 'synthesizing'
+    && !response.isLoadedFromHistory;
 
   return (
     <div>
-      {/* User's Prompt Bubble */}
       <div className="user-prompt">
         {response.prompt}
       </div>
 
       <AnimatePresence mode="wait">
-
-        {/* STATE 1: No content yet — show ProcessingTimeline */}
         {!hasContent && !response.error && (
-          <motion.div
+          <MotionDiv
             key="timeline-view"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -35,20 +36,34 @@ const ResponseContainer = ({ response, isLastTurn }) => {
             transition={{ duration: 0.3 }}
           >
             <ProcessingTimeline progress={response.progress} />
-          </motion.div>
+          </MotionDiv>
         )}
 
-        {/* STATE 2 & 3: Has content — show tabbed UI (markdown + optional Thesys tab) */}
-        {hasContent && !response.error && (
-          <motion.div
+        {hasContent && (
+          <MotionDiv
             key="content-view"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
             <div className="ai-response-container">
+              {(warnings.length > 0 || response.error) && (
+                <div className="response-notice-stack">
+                  {warnings.map((warning) => (
+                    <div key={warning} className="response-notice warning">
+                      <BsExclamationTriangle />
+                      <span>{warning}</span>
+                    </div>
+                  ))}
+                  {response.error && (
+                    <div className="response-notice error">
+                      <BsExclamationTriangle />
+                      <span>{response.error}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {/* Tabs */}
               <div className="tabs">
                 <button
                   className={`tab ${activeTab === 'Answer' ? 'active' : ''}`}
@@ -57,7 +72,6 @@ const ResponseContainer = ({ response, isLastTurn }) => {
                   <BsFileText /> Answer
                 </button>
 
-                {/* Interactive tab — only shown once Thesys finishes */}
                 {response.auiSpec && response.auiSpec.trim() && (
                   <button
                     className={`tab ${activeTab === 'Interactive' ? 'active' : ''}`}
@@ -72,7 +86,7 @@ const ResponseContainer = ({ response, isLastTurn }) => {
                     className={`tab ${activeTab === 'Sources' ? 'active' : ''}`}
                     onClick={() => setActiveTab('Sources')}
                   >
-                    <BsLink45Deg /> Sources · {response.sources.length}
+                    <BsLink45Deg /> Sources - {response.sources.length}
                   </button>
                 )}
 
@@ -81,7 +95,7 @@ const ResponseContainer = ({ response, isLastTurn }) => {
                     className={`tab ${activeTab === 'Images' ? 'active' : ''}`}
                     onClick={() => setActiveTab('Images')}
                   >
-                    <BsImages /> Images · {response.images.length}
+                    <BsImages /> Images - {response.images.length}
                   </button>
                 )}
 
@@ -95,10 +109,7 @@ const ResponseContainer = ({ response, isLastTurn }) => {
                 )}
               </div>
 
-              {/* Tab Content */}
               <div className="tab-content">
-
-                {/* Answer tab — always the live markdown */}
                 {activeTab === 'Answer' && (
                   <StreamingMarkdown
                     content={response.streamingMarkdown}
@@ -107,15 +118,14 @@ const ResponseContainer = ({ response, isLastTurn }) => {
                   />
                 )}
 
-                {/* Interactive tab — Thesys C1 rendered UI */}
                 {activeTab === 'Interactive' && response.auiSpec && (
                   <C1Component c1Response={response.auiSpec} />
                 )}
 
                 {activeTab === 'Sources' && (
                   <div className="sources-grid">
-                    {response.sources.map((src, i) => (
-                      <SourceCard key={i} source={src} />
+                    {response.sources.map((src) => (
+                      <SourceCard key={src.url || src.title} source={src} />
                     ))}
                   </div>
                 )}
@@ -127,24 +137,24 @@ const ResponseContainer = ({ response, isLastTurn }) => {
                 {activeTab === 'Steps' && (
                   <StepsTimeline steps={response.steps} />
                 )}
-
               </div>
             </div>
-          </motion.div>
+          </MotionDiv>
         )}
 
-        {/* Error state */}
-        {response.error && (
-          <motion.div
+        {response.error && !hasContent && (
+          <MotionDiv
             key="error-view"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="error-message">{response.error}</div>
-          </motion.div>
+            <div className="error-message">
+              <BsExclamationTriangle />
+              <span>{response.error}</span>
+            </div>
+          </MotionDiv>
         )}
-
       </AnimatePresence>
     </div>
   );

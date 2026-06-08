@@ -1,29 +1,59 @@
 import os
+import logging
+
 import motor.motor_asyncio
 from dotenv import load_dotenv
+from pymongo import ASCENDING, DESCENDING
 
-# Load environment variables from the .env file
+
 load_dotenv()
 
-# DATABASE CONFIGURATION 
+logger = logging.getLogger(__name__)
+
 MONGO_CONNECTION_STRING = os.getenv("MONGO_CONNECTION_STRING")
+db_client = None
+users_collection = None
+conversations_collection = None
+_indexes_ready = False
 
 if not MONGO_CONNECTION_STRING:
-    print("🚨 FATAL: MONGO_CONNECTION_STRING not found in environment variables.")
-    db_client = None
-    conversations_collection = None
+    logger.warning("MONGO_CONNECTION_STRING is not configured.")
 else:
     try:
-        print("✅ [DB_CONFIG] Connecting to local MongoDB...")
+        logger.info("Initializing MongoDB client.")
         db_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_CONNECTION_STRING)
-        
-        # Define your database and collection names
         db = db_client.perplexity_clone_db
+        users_collection = db.users
         conversations_collection = db.conversations
-        
-        print("✅ [DB_CONFIG] MongoDB client initialized successfully.")
-        
+        logger.info("MongoDB client initialized.")
     except Exception as e:
-        print(f"🚨 [DB_CONFIG] Failed to connect to MongoDB: {e}")
-        db_client = None
-        conversations_collection = None
+        logger.exception("Failed to initialize MongoDB client: %s", e)
+
+
+async def ensure_database_indexes() -> bool:
+    global _indexes_ready
+
+    if _indexes_ready:
+        return True
+
+    if users_collection is None or conversations_collection is None:
+        return False
+
+    await users_collection.create_index([("email", ASCENDING)], unique=True, name="users_email_unique")
+    await conversations_collection.create_index(
+        [("user_id", ASCENDING), ("session_id", ASCENDING), ("turn_number", ASCENDING)],
+        unique=True,
+        name="conversation_turn_unique",
+    )
+    await conversations_collection.create_index(
+        [("user_id", ASCENDING), ("created_at", DESCENDING)],
+        name="conversation_user_created_at",
+    )
+    await conversations_collection.create_index(
+        [("user_id", ASCENDING), ("session_id", ASCENDING)],
+        name="conversation_session_lookup",
+    )
+
+    _indexes_ready = True
+    logger.info("MongoDB indexes are ready.")
+    return True

@@ -1,6 +1,4 @@
-/* 
-   GLOBAL LAYOUT & BACKGROUND
-    */
+
 
 .welcome-container {
     position: absolute;
@@ -12,12 +10,10 @@
 }
 
 
-/* 
-   ARGON CORE CONTAINER
-    */
+
 
 .argon-core {
-    position: relative; 
+    position: relative;
     width: 100%;
     height: 100vh;
     pointer-events: none;
@@ -58,9 +54,7 @@
     margin-bottom: 5vh;
 }
 
-/* 
-   SECTION 1 – HEADER
-    */
+
 
 .landing-header {
     text-align: center;
@@ -71,17 +65,17 @@
     font-weight: 700;
     color: white;
     margin: 0;
-    
-    /* Premium glow effect matching star theme */
-    text-shadow: 
+
+
+    text-shadow:
         0 0 20px rgba(255, 255, 255, 0.15),
         0 0 40px rgba(255, 255, 255, 0.1),
         0 2px 4px rgba(0, 0, 0, 0.5);
-    
-    /* Subtle letter spacing for elegance */
+
+
     letter-spacing: 2px;
-    
-    /* Smooth transition for any future hover effects */
+
+
     transition: all 0.3s ease;
 }
 
@@ -89,11 +83,11 @@
 .tagline {
     font-size: 1.75rem;
     font-weight: 500;
-    color: #e8e8e8; /* Slightly brighter than before */
+    color: #e8e8e8;
     margin-bottom: 30px;
     text-align: center;
-    
-    /* Subtle text shadow for depth */
+
+
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -102,45 +96,43 @@
     gap: 15px;
     margin-top: 25px;
     justify-content: center;
-    flex-wrap: wrap; /* Responsive: wrap on smaller screens */
+    flex-wrap: wrap;
 }
 
 .keyword-item {
     font-size: 0.8rem;
     font-weight: 500;
-    color: #b8b8b8; /* Brighter default text */
-    
-    /* Stronger border and background */
-    border: 1px solid rgba(255, 255, 255, 0.25); /* Was 0.2, now 0.25 */
-    background-color: rgba(255, 255, 255, 0.08); /* Was 0.05, now 0.08 */
-    
-    padding: 8px 16px; /* Slightly more padding */
+    color: #b8b8b8;
+
+
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background-color: rgba(255, 255, 255, 0.08);
+
+    padding: 8px 16px;
     border-radius: 8px;
-    
-    /* Smooth transitions */
+
+
     transition: all 0.3s ease;
-    
-    /* Subtle inner glow */
+
+
     box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05);
 }
 
 .keyword-item:hover {
     color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.5); /* Was 0.7, toned down slightly */
+    border-color: rgba(255, 255, 255, 0.5);
     background-color: rgba(255, 255, 255, 0.12);
-    
-    /* Star-inspired glow on hover */
+
+
     text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
-    box-shadow: 
+    box-shadow:
         0 0 12px rgba(255, 255, 255, 0.15),
         inset 0 1px 2px rgba(255, 255, 255, 0.1);
-    
-    /* Subtle lift effect */
+
+
     transform: translateY(-1px);
 }
-/* 
-   SECTION 2 – SEARCH FORM
-    */
+
 
 .landing-prompt-form {
     display: flex;
@@ -149,17 +141,17 @@
     width: 100%;
     max-width: 700px;
     background-color: #1e1e1e;
-    
-    /* Stronger default border */
-    border: 2px solid #333333; /* Was #2a2a2a, now brighter */
-    border-radius: 20px; 
+
+
+    border: 2px solid #333333;
+    border-radius: 20px;
     padding: 16px 20px 12px 20px;
-    
-    /* Smooth transitions */
+
+
     transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
     margin-bottom: 80px;
-    
-    /* Subtle depth */
+
+
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
@@ -167,7 +159,7 @@
     flex-grow: 1;
     background: transparent;
     border: none;
-    color: #f0f0f0; /* Brighter text */
+    color: #f0f0f0;
     font-size: 1.1rem;
     font-family: 'Inter', sans-serif;
     height: 30px;
@@ -178,10 +170,10 @@
 
 
 .landing-prompt-form:focus-within {
-    /* Stronger focus glow with blue tint */
-    border-color: #6a737e; /* Blue accent */
-    background-color: #222222; /* Slightly lighter on focus */
-    box-shadow: 
+
+    border-color: #6a737e;
+    background-color: #222222;
+    box-shadow:
         0 0 20px rgba(97, 121, 148, 0.2),
         0 4px 16px rgba(0, 0, 0, 0.4);
 }
@@ -233,11 +225,11 @@
 }
 
 .action-btn {
-    background-color: #2a2a2a; /* Slightly lighter default */
-    color: #a0a0a0; /* Brighter icon color */
-    border: 1px solid #3f3f3f; /* Stronger border */
+    background-color: #2a2a2a;
+    color: #a0a0a0;
+    border: 1px solid #3f3f3f;
     border-radius: 12px;
-    font-size: 20px; 
+    font-size: 20px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -245,51 +237,51 @@
     transition: all 0.25s ease;
     width: 36px;
     height: 36px;
-    
-    /* Subtle shadow */
+
+
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .submit-btn {
-    background-color: #4a90e2; /* Professional blue instead of generic */
+    background-color: #4a90e2;
     color: white;
     border: none;
-    padding: 10px 24px; /* Slightly wider padding */
-    border-radius: 10px; /* Slightly more rounded */
+    padding: 10px 24px;
+    border-radius: 10px;
     cursor: pointer;
     font-size: 1rem;
-    font-weight: 600; /* Bolder */
+    font-weight: 600;
     transition: all 0.25s ease;
-    
-    /* Subtle shadow */
+
+
     box-shadow: 0 1px 1px rgba(137, 146, 157, 0.3);
 }
 
-.submit-btn:hover { 
-    background-color: blueviolet; 
+.submit-btn:hover {
+    background-color: blueviolet;
 }
 
-.submit-btn:disabled { 
-    background-color: #2a2a2a; 
-    color: #666; /* Slightly brighter disabled text */
+.submit-btn:disabled {
+    background-color: #2a2a2a;
+    color: #666;
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
 }
 
 .action-btn:hover {
-    background-color: #3a3a3a; 
-    color: #ffffff; /* Pure white on hover */
+    background-color: #3a3a3a;
+    color: #ffffff;
     border-color: #5a5a5a;
-    
-    /* Subtle lift */
+
+
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .landing-prompt-form .web-search-toggle.active {
-    background-color: #326fb5; /* Professional blue */
-    color: white;             
+    background-color: #326fb5;
+    color: white;
     border-color: #5a9ff5;
     box-shadow: 0 0 12px rgba(74, 144, 226, 0.4);
 }
@@ -302,9 +294,7 @@
 }
 
 
-/* 
-   SECTION 3 – EXAMPLE PROMPTS
-    */
+
 
 .example-prompts-landing {
     display: flex;
@@ -312,50 +302,47 @@
     justify-content: center;
     margin-bottom: 150px;
     padding-bottom: 2vh;
-    flex-wrap: wrap; /* Responsive */
+    flex-wrap: wrap;
 }
 
 
 .example-prompts-landing button {
-    /* Stronger default state */
-    background: rgba(255, 255, 255, 0.04); /* Was transparent */
-    border: 1px solid rgba(255, 255, 255, 0.28); /* Was 0.2, now stronger */
-    color: #c0c0c0; /* Brighter text */
-    
-    padding: 12px 20px; /* More padding for better click target */
-    border-radius: 10px; /* More rounded for modern feel */
+
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #c0c0c0;
+
+    padding: 12px 20px;
+    border-radius: 10px;
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: 500;
-    
-    /* Smooth transitions */
+
+
     transition: all 0.3s ease;
-    
-    /* Subtle shadow for depth */
+
+
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .example-prompts-landing button:hover {
-    background-color: rgba(255, 255, 255, 0.12); /* Was 0.1 */
-    border-color: rgba(255, 255, 255, 0.45); /* Was 0.4 */
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.45);
     color: #ffffff;
-    
-    /* Star-inspired glow */
-    box-shadow: 
+
+
+    box-shadow:
         0 0 12px rgba(255, 255, 255, 0.15),
         0 4px 8px rgba(0, 0, 0, 0.3);
-    
-    /* Subtle scale for interactive feel */
+
+
     transform: translateY(-2px) scale(1.02);
 }
 
 
-/* 
-   STAR FIELD SYSTEM - GROKIPEDIA STYLE (+ SHAPED STARS)
-   REPLACE ENTIRE STAR SECTION WITH THIS
-    */
 
-/* Star field container */
+
+
 .star-field-container {
     position: absolute;
     inset: 0;
@@ -364,77 +351,77 @@
     overflow: hidden;
 }
 
-/* Base star container (+ shape made from two bars) */
+
 .star-plus {
     position: absolute;
     pointer-events: none;
     transform: translate(-50%, -50%);
-    
-    /* Use CSS variables for dynamic sizing */
+
+
     width: var(--base-size, 2px);
     height: var(--base-size, 2px);
-    
-    /* Apply the glow/pulse animation */
+
+
     animation: starGlowPulse var(--animation-duration, 5s) ease-in-out infinite;
     animation-delay: var(--animation-delay, 0s);
 }
 
-/* Horizontal bar of the + sign */
+
 .star-plus-horizontal {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 100%;
-    height: 20%; /* Thickness of the bar */
+    height: 20%;
     background: white;
     box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
-/* Vertical bar of the + sign */
+
 .star-plus-vertical {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 20%; /* Thickness of the bar */
+    width: 20%;
     height: 100%;
     background: white;
     box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
-/* THE KEY ANIMATION: Size grows + glow intensifies, then shrinks + fades */
+
 @keyframes starGlowPulse {
     0% {
-        /* Start: Small size, very dim */
+
         width: var(--base-size, 2px);
         height: var(--base-size, 2px);
         opacity: 0.15;
         filter: brightness(0.6) blur(0px);
     }
-    
+
     15% {
-        /* Gentle fade in */
+
         opacity: 0.3;
         filter: brightness(0.8) blur(0px);
     }
-    
+
     50% {
-        /* Peak glow: Maximum size, bright, glowing */
+
         width: var(--glow-size, 4px);
         height: var(--glow-size, 4px);
         opacity: 1;
         filter: brightness(1.5) blur(0.3px) drop-shadow(0 0 3px rgba(255, 255, 255, 0.9));
     }
-    
+
     85% {
-        /* Gentle fade out */
+
         opacity: 0.3;
         filter: brightness(0.8) blur(0px);
     }
-    
+
     100% {
-        /* End: Back to small size, very dim */
+
         width: var(--base-size, 2px);
         height: var(--base-size, 2px);
         opacity: 0.15;
@@ -442,7 +429,7 @@
     }
 }
 
-/* Ensure welcome container has deep space background */
+
 .welcome-container {
     position: absolute;
     inset: 0;
@@ -451,7 +438,7 @@
     z-index: 100;
 }
 
-/* Ensure argon-core content sits above stars */
+
 .argon-core {
     position: relative;
     z-index: 10;
@@ -477,7 +464,7 @@
     pointer-events: none;
 }
 
-/* Performance optimization: Use GPU acceleration */
+
 .star-plus,
 .star-plus-horizontal,
 .star-plus-vertical {

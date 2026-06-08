@@ -1,7 +1,14 @@
-import React from 'react';
+const getHostname = (url) => {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return url || 'source';
+  }
+};
 
 function SourceCard({ source }) {
-  const hostname = new URL(source.url).hostname.replace('www.', '');
+  const hostname = getHostname(source.url);
+
   return (
     <a href={source.url} target="_blank" rel="noopener noreferrer" className="source-card">
       <img

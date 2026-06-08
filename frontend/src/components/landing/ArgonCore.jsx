@@ -1,4 +1,4 @@
-import React from 'react';import { FiLoader, FiGlobe } from 'react-icons/fi';
+import { FiGlobe, FiLoader } from 'react-icons/fi';
 import { BsMicFill } from 'react-icons/bs';
 import TextareaAutosize from 'react-textarea-autosize';
 
@@ -12,8 +12,10 @@ function ArgonCore({
   setForceWebSearch, 
   isSpeechRecognitionSupported, 
   isListening, 
-  handleMicClick
+  handleMicClick,
+  user
 }) {
+  const displayName = user?.name?.trim() || user?.email?.split('@')[0] || 'there';
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -41,7 +43,7 @@ function ArgonCore({
         </div>
 
         <div className="landing-interactive-area">
-          <p className="tagline">What can I help with?</p>
+          <p className="tagline">Hello, {displayName}</p>
   
           <form 
             onSubmit={handleFormSubmit} 

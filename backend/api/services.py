@@ -1,78 +1,74 @@
-import os 
-import json
-import google.generativeai as genai
-from typing import List
-
-#stage 3
 import asyncio
-from tavily import AsyncTavilyClient
-from typing import Dict, Any
-
-#stage 4
-from crawl4ai import AsyncWebCrawler
-
-#stage 5
-from typing import Dict, Any, AsyncGenerator, List 
-from asgiref.sync import sync_to_async
-
-# New Intelligent Classification Pipeline
+import json
+import logging
+import os
 import re
-from datetime import datetime
-
-# NLP function 
-import spacy
-from typing import Dict, Any
-
-# Interactive UI
-import httpx
-
-#thesys
-import html
-
-#database
+import time
 from datetime import datetime, timezone
+from typing import Any, AsyncGenerator, Dict, List
+
+import google.generativeai as genai
+import spacy
+from tavily import AsyncTavilyClient
+from django.conf import settings
+
 from .db_config import conversations_collection
 
-
-import re
-
-import time
-
-from typing import List, Tuple, Dict, Any, AsyncGenerator
-
 _phase_timers = {}
+logger = logging.getLogger(__name__)
+
+
+class ProviderError(Exception):
+    def __init__(self, provider: str, public_message: str):
+        super().__init__(public_message)
+        self.provider = provider
+        self.public_message = public_message
+
+
+async def with_timeout(coro, timeout_seconds: int, provider: str, public_message: str):
+    try:
+        return await asyncio.wait_for(coro, timeout=timeout_seconds)
+    except asyncio.TimeoutError as exc:
+        logger.warning("%s timed out after %ss.", provider, timeout_seconds)
+        raise ProviderError(provider, public_message) from exc
+
+
+async def iter_with_timeout(async_iterable, timeout_seconds: int, provider: str, public_message: str):
+    iterator = async_iterable.__aiter__()
+    while True:
+        try:
+            item = await asyncio.wait_for(iterator.__anext__(), timeout=timeout_seconds)
+            yield item
+        except StopAsyncIteration:
+            break
+        except asyncio.TimeoutError as exc:
+            logger.warning("%s stream timed out after %ss.", provider, timeout_seconds)
+            raise ProviderError(provider, public_message) from exc
+
 
 def phase_start(name: str):
     _phase_timers[name] = time.perf_counter()
-    print(f"  ⏱ [{name}] STARTED")
+    logger.info("[TIMER] %s started", name)
+
 
 def phase_end(name: str):
     start = _phase_timers.pop(name, None)
     if start:
         elapsed = time.perf_counter() - start
-        print(f"  ✅ [{name}] DONE — {elapsed:.2f}s")
+        logger.info("[TIMER] %s finished in %.2fs", name, elapsed)
         return elapsed
     return 0.0
 
 
-# Read the API key directly from the environment variable.
 try:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         raise ValueError("GOOGLE_API_KEY not found in environment variables.")
-    # Configure the library ONCE when the module is loaded.
     genai.configure(api_key=api_key)
-    print("✅ [SERVICES] Google Generative AI configured successfully.")
+    logger.info("Google Generative AI configured.")
 except Exception as e:
-    print(f"🚨 [SERVICES] Failed to configure Google Generative AI: {e}")
+    logger.exception("Failed to configure Google Generative AI: %s", e)
 
-
-
-class GeminiError(Exception):
-    """Custom exception for errors related to the Gemini API."""
-    pass
-
-# Contextual metadata extraction 
 
 def _format_context_for_prompt(context_package: Dict[str, Any]) -> str:
     """Formats the conversation history into a clean, readable string for LLM prompts."""
@@ -97,7 +93,7 @@ def extract_contextual_metadata(prompt: str) -> Dict[str, bool]:
     Performs a rapid, computationally cheap analysis of the query's form
     to extract key contextual metadata before deeper processing.
     """
-    print("✅ [CLASSIFIER STAGE 1] Extracting contextual metadata...")
+    print("[CLASSIFIER STAGE 1] Extracting contextual metadata...")
     
     prompt_lower = prompt.lower()
     
@@ -202,9 +198,9 @@ def extract_contextual_metadata(prompt: str) -> Dict[str, bool]:
 
 try:
     nlp = spacy.load("en_core_web_sm")
-    print("✅ [CLASSIFIER STAGE 2] spaCy model 'en_core_web_sm' loaded successfully.")
+    print("[CLASSIFIER STAGE 2] spaCy model 'en_core_web_sm' loaded successfully.")
 except OSError:
-    print("🚨 [CLASSIFIER STAGE 2] spaCy model not found. Please run 'python -m spacy download en_core_web_sm'")
+    print("[CLASSIFIER STAGE 2] spaCy model not found. Please run 'python -m spacy download en_core_web_sm'")
     nlp = None
 
 # Defining the programmatic mapping from LLM classifications to numerical scores
@@ -261,7 +257,7 @@ def _get_linguistic_features(prompt: str) -> Dict[str, Any]:
     }
 
 def _get_llm_classifications(prompt: str, linguistic_features: Dict[str, Any], context_metadata: Dict[str, Any], context_package: Dict[str, Any]) -> Dict[str, str]:
-    """(UPDATED FOR CONTEXT) Helper to get semantic classifications from the LLM."""
+    """Gets semantic routing labels from Gemini."""
     
     # Use our helper to format the conversation history
     conversation_history = _format_context_for_prompt(context_package)
@@ -317,7 +313,7 @@ You MUST respond with ONLY a valid JSON object with four keys.
         response = model.generate_content(system_prompt)
         return json.loads(response.text)
     except Exception as e:
-        print(f"🚨 [CLASSIFIER STAGE 2] Error during LLM classification: {e}")
+        print(f"[CLASSIFIER STAGE 2] Error during LLM classification: {e}")
         return {
             "intent_type": "general_qa",
             "entity_type": "broad_concept",
@@ -338,7 +334,7 @@ def generate_nlp_features_and_scores(prompt: str, context_metadata: Dict[str, bo
     Returns:
         A dictionary of the final six numerical scores.
     """
-    print("✅ [CLASSIFIER STAGE 2] Generating NLP features and scores...")
+    print("[CLASSIFIER STAGE 2] Generating NLP features and scores...")
     
     linguistic_features = _get_linguistic_features(prompt)
     print(f"  > Linguistic Features (spaCy): {linguistic_features}")
@@ -396,7 +392,7 @@ def make_routing_decision(scores: Dict[str, float]) -> str:
     Returns:
         A string: 'search_required' or 'direct_answer'.
     """
-    print("✅ [CLASSIFIER STAGE 3] Making final routing decision...")
+    print("[CLASSIFIER STAGE 3] Making final routing decision...")
 
     # Ensure all expected scores are present, defaulting to a neutral 0.5 if not
     required_keys = CLASSIFIER_WEIGHTS.keys()
@@ -428,50 +424,30 @@ def make_routing_decision(scores: Dict[str, float]) -> str:
     return path
 
 async def get_intelligent_path(prompt: str, context_package: Dict[str, Any]) -> str:
-    """(CORRECTED) The main orchestrator for the classification pipeline."""
-    print("🚀 STARTING INTELLIGENT CLASSIFICATION PIPELINE 🚀")
+    """Runs the routing pipeline and returns the answer path."""
+    print("[CLASSIFIER] Starting routing pipeline.")
 
     phase_start("classifier") 
 
     context_metadata = extract_contextual_metadata(prompt)
     
     loop = asyncio.get_running_loop()
-    scores = await loop.run_in_executor(
-        None, generate_nlp_features_and_scores, prompt, context_metadata, context_package
+    scores = await with_timeout(
+        loop.run_in_executor(None, generate_nlp_features_and_scores, prompt, context_metadata, context_package),
+        settings.METADATA_TIMEOUT_SECONDS,
+        "Gemini classifier",
+        "The routing model took too long, so ARGON could not safely choose an answer path. Please try again.",
     )
     
     final_path = make_routing_decision(scores)
 
     phase_end("classifier") 
 
-    print(f"🏁 INTELLIGENT PIPELINE FINISHED. Final Path: {final_path} 🏁")
+    print(f"[CLASSIFIER] Routing finished. Final path: {final_path}")
     
     return final_path
 
 
-
-def _sanitize_raw_content(content: str, max_chars: int = 10000) -> str:
-    """
-    Cleans raw web content for LLM consumption.
-    """
-    if not content:
-        return ""
-
-    # 1. Remove common HTML-like artifacts if they leaked in
-    content = re.sub(r'<script.*?>.*?</script>', '', content, flags=re.DOTALL)
-    content = re.sub(r'<style.*?>.*?</style>', '', content, flags=re.DOTALL)
-    content = re.sub(r'<.*?>', '', content) # Strip any remaining tags
-
-    # 2. Normalize whitespace (Replace multiple newlines/tabs with a single space)
-    content = re.sub(r'\s+', ' ', content).strip()
-
-    # 3. Content Truncation (Protect the context window)
-    if len(content) > max_chars:
-        content = content[:max_chars] + "... [Content Truncated]"
-
-    return content
-
-# stage 3
 
 async def _search_tavily_async(query: str) -> Dict[str, Any]:
     """
@@ -481,22 +457,26 @@ async def _search_tavily_async(query: str) -> Dict[str, Any]:
     """
 
     trigger_time = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-    print(f"⏱ [TAVILY] API Call Triggered at: {trigger_time}")
+    print(f"[TAVILY] API Call Triggered at: {trigger_time}")
 
 
     tavily_api_key = os.getenv("TAVILY_API_KEY")
     tavily_client = AsyncTavilyClient(api_key=tavily_api_key)
 
     try:
-        # This call now returns in 2-4 seconds because it's not scraping full HTML
         phase_start("tavily_api_latency")
 
-        response = await tavily_client.search(
-            query=query,
-            search_depth="advanced",
-            max_results=6,
-            include_answer=True,      # <--- NEW: Get the instant answer
-            include_raw_content=False # <--- CRITICAL: Disable slow scraping
+        response = await with_timeout(
+            tavily_client.search(
+                query=query,
+                search_depth="advanced",
+                max_results=6,
+                include_answer=True,
+                include_raw_content=False
+            ),
+            settings.TAVILY_TIMEOUT_SECONDS,
+            "Tavily web search",
+            "Live web search is taking too long. Try again, or turn off web search for a direct answer.",
         )
 
         phase_end("tavily_api_latency")
@@ -506,8 +486,12 @@ async def _search_tavily_async(query: str) -> Dict[str, Any]:
 
         phase_end("tavily_api_latency")
 
-        print(f"⚠️ Tavily failed: {e}")
-        return {"results": [], "answer": None}
+        logger.warning("Tavily web search failed: %s", e)
+        return {
+            "results": [],
+            "answer": None,
+            "provider_error": "Live web search is temporarily unavailable. ARGON will continue with a direct answer.",
+        }
     
 
 async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
@@ -527,17 +511,22 @@ async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
 
         tavily_api_key = os.getenv("TAVILY_API_KEY")
         if not tavily_api_key:
-            print("🚨 TAVILY_API_KEY not found in environment variables.")
+            print("[TAVILY] TAVILY_API_KEY not found in environment variables.")
             return []
         
         tavily_client = AsyncTavilyClient(api_key=tavily_api_key)
         
         # The core of this function make the API call with include_images=True
-        response = await tavily_client.search(
-            query=query,
-            search_depth="basic",    
-            include_images=True,     
-            max_results=15          
+        response = await with_timeout(
+            tavily_client.search(
+                query=query,
+                search_depth="basic",
+                include_images=True,
+                max_results=15
+            ),
+            settings.TAVILY_TIMEOUT_SECONDS,
+            "Tavily image search",
+            "Image search is temporarily unavailable.",
         )
         
 
@@ -547,61 +536,13 @@ async def _get_images_from_tavily_async(query: str) -> List[Dict[str, Any]]:
         return images
         
     except Exception as e:
-        print(f"  🚨 Error during IMAGE search for '{query}': {e}")
+        logger.warning("Tavily image search failed for %s: %s", query, e)
         return []
 
 
-async def get_full_context_from_queries(queries: List[str]) -> AsyncGenerator[Dict[str, Any], None]:
-    print(f"✅ [SERVICES] Starting Unified Retrieval for {len(queries)} queries...")
-
-    phase_start("tavily_search") 
-
-    tasks = [_search_tavily_async(query) for query in queries]
-    
-    all_context = []
-    unique_sources = set()
-
-    for future in asyncio.as_completed(tasks):
-        results_from_one_query = await future
-        
-        # ... inside get_full_context_from_queries loop ...
-
-        for result in results_from_one_query:
-            url = result.get("url")
-            if url and url not in unique_sources:
-                raw_text = result.get("raw_content") or result.get("content", "")
-                
-                # APPLY PHASE 2 SANITIZATION
-                clean_text = _sanitize_raw_content(raw_text)
-
-                # APPLY USABILITY FILTER (200 char minimum)
-                if len(clean_text) > 200: 
-                    unique_sources.add(url)
-                    all_context.append({
-                        "source": url,
-                        "title": result.get("title", "Untitled Source"),
-                        "content": clean_text # Now using the cleaned, truncated text
-                    })
-                    yield {"event": "source_found", "data": {"count": len(all_context)}}
-                else:
-                    print(f"  ⚠️ Skipping {url}: Content too thin or poor quality.")
-
-    phase_end("tavily_search")
-
-    # Phase 1 Limitation: Ensure we don't pass TOO much data to Gemini yet
-    MAX_SOURCES = 6
-    final_context = all_context[:MAX_SOURCES]
-    
-    print(f"✅ [SERVICES] Retrieval Complete. {len(final_context)} sources ready for synthesis.")
-
-    # Yield the final data package to the orchestrator
-    yield {"event": "context_complete", "data": {"scraped_data": final_context}}
-
-
-# thesys implementation 
 async def generate_ui_spec_from_markdown(markdown_content: str, context_package: Dict[str, Any]) -> str:
-    """(UPDATED FOR CONTEXT) The primary bridge to Thesys."""
-    print("✅ [THESYS] Starting conversion of Markdown to UI Spec...")
+    """Converts the final Markdown answer into a Thesys C1 response."""
+    print("[THESYS] Converting Markdown to C1.")
 
     phase_start("thesys")
     
@@ -682,16 +623,15 @@ Don't just format the markdown - REIMAGINE it as an interface. Ask yourself: "If
         phase_end("thesys")  
 
         if 200 <= status_code < 300:
-            print("✅ [THESYS] Successfully received raw C1 DSL string.")
+            print("[THESYS] Received C1 response.")
             return raw_dsl_string
         else:
-            print(f"🚨 [THESYS] Failed to generate UI Spec. Status: {status_code}")
-            # Return an error string that the orchestrator can detect
-            return "Error: The UI generation service failed to respond correctly."
+            logger.warning("Thesys failed to generate C1 response. status=%s", status_code)
+            return "<C1><P>Interactive UI generation is temporarily unavailable. The Markdown answer is still available.</P></C1>"
 
     except Exception as e:
-        print(f"🚨 [THESYS] A critical error occurred during UI generation: {e}")
-        return f"Error: An error occurred during UI generation: {str(e)}"
+        logger.warning("Thesys UI generation error: %s", e)
+        return "<C1><P>Interactive UI generation is temporarily unavailable. The Markdown answer is still available.</P></C1>"
 
 
 async def call_thesys_chat_api(prompt: str):
@@ -699,10 +639,10 @@ async def call_thesys_chat_api(prompt: str):
     Uses the official OpenAI client pointed at the Thesys endpoint.
     This is the recommended approach per Thesys docs.
     """
-    print("  > [THESYS_API] Calling Thesys via OpenAI-compatible client...")
+    print("[THESYS_API] Calling Thesys via OpenAI-compatible client...")
     api_key = os.getenv("THESYS_API_KEY")
     if not api_key:
-        print("🚨 FATAL: THESYS_API_KEY not found.")
+        print("[THESYS_API] THESYS_API_KEY is not configured.")
         return json.dumps({"error": "Server API key not configured."}), 500
 
     try:
@@ -713,29 +653,34 @@ async def call_thesys_chat_api(prompt: str):
             base_url="https://api.thesys.dev/v1/embed"
         )
 
-        completion = await client.chat.completions.create(
-            model="c1/anthropic/claude-sonnet-4.6/v-20260331",  # ← UPGRADED MODEL
-            messages=[{"role": "user", "content": prompt}],
+        completion = await with_timeout(
+            client.chat.completions.create(
+                model="c1/anthropic/claude-sonnet-4.6/v-20260331",
+                messages=[{"role": "user", "content": prompt}],
+            ),
+            settings.THESYS_TIMEOUT_SECONDS,
+            "Thesys UI generation",
+            "Interactive UI generation is taking too long. The Markdown answer is still available.",
         )
 
         message_content = completion.choices[0].message.content
 
         if message_content is None:
-            print("🚨 [THESYS_API] ERROR: message content is None.")
+            print("[THESYS_API] Empty response content.")
             return json.dumps({"error": "Empty response from Thesys."}), 500
 
-        print(f"  ✅ [THESYS_API] Success. Response length: {len(message_content)} chars.")
+        print(f"[THESYS_API] Response length: {len(message_content)} chars.")
         return str(message_content), 200
 
     except Exception as e:
-        print(f"🚨 [THESYS_API] Unexpected Error: {e}")
+        print(f"[THESYS_API] Unexpected error: {e}")
         return json.dumps({"error": "Unexpected server error.", "details": str(e)}), 500
     
     
 async def _synthesize_answer_from_context(
     prompt: str, scraped_data: List[Dict[str, str]], context_package: Dict[str, Any]
 ) -> AsyncGenerator[str, None]:
-    """(UPDATED FOR CONTEXT) Final RAG synthesis step."""
+    """Streams a cited answer from the retrieved source snippets."""
     
     phase_start("synthesis")  
 
@@ -804,11 +749,11 @@ Follow this hierarchy based on question complexity:
 
 **RULE 6: QUALITY INDICATORS**
 Your answer must have:
-✓ A clear "answer" to the question in the first 2 sentences
-✓ Logical flow (each paragraph connects to the next)
-✓ Specific details, not vague generalities
-✓ Citations that feel natural, not intrusive
-✓ A sense of completeness (reader feels satisfied)
+ A clear "answer" to the question in the first 2 sentences
+ Logical flow (each paragraph connects to the next)
+ Specific details, not vague generalities
+ Citations that feel natural, not intrusive
+ A sense of completeness (reader feels satisfied)
 
 
 === SNIPPET PROCESSING ===
@@ -830,12 +775,12 @@ Use them to build a comprehensive answer. If a snippet is truncated, cite what i
 Use phrases like "Generally...", "In most cases...", "However, there are exceptions..."
 
 === ANTI-PATTERNS (NEVER DO THIS) ===
-❌ Starting with "Based on the sources provided..." (assumed)
-❌ Ending with "I hope this helps!" (too casual)
-❌ Apologizing ("Sorry, but...") - be confident or transparent
-❌ Over-hedging ("might", "perhaps", "possibly" in every sentence)
-❌ Bullet lists without context (always have a lead-in sentence)
-❌ Walls of text (break into paragraphs of 3-5 sentences max)
+ Starting with "Based on the sources provided..." (assumed)
+ Ending with "I hope this helps!" (too casual)
+ Apologizing ("Sorry, but...") - be confident or transparent
+ Over-hedging ("might", "perhaps", "possibly" in every sentence)
+ Bullet lists without context (always have a lead-in sentence)
+ Walls of text (break into paragraphs of 3-5 sentences max)
 
 === YOUR TONE ===
 Professional but approachable. You're a knowledgeable colleague, not a formal report. Use "you" when addressing the user. Vary sentence length for readability.
@@ -853,8 +798,18 @@ Professional but approachable. You're a knowledgeable colleague, not a formal re
     model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
 
    
-    response_stream = await model.generate_content_async(full_prompt, stream=True)
-    async for chunk in response_stream:
+    response_stream = await with_timeout(
+        model.generate_content_async(full_prompt, stream=True),
+        settings.PROVIDER_TIMEOUT_SECONDS,
+        "Gemini synthesis",
+        "Answer synthesis is taking too long. Please try again.",
+    )
+    async for chunk in iter_with_timeout(
+        response_stream,
+        settings.GEMINI_STREAM_TIMEOUT_SECONDS,
+        "Gemini synthesis",
+        "Answer synthesis stopped responding. Please try again.",
+    ):
         if chunk.text:
             yield chunk.text
 
@@ -864,24 +819,24 @@ Professional but approachable. You're a knowledgeable colleague, not a formal re
 
 
 async def generate_and_stream_answer(
-    prompt: str, path: str, session_id: str, turn_number: int, context_package: Dict[str, Any]
+    prompt: str,
+    path: str,
+    session_id: str,
+    turn_number: int,
+    context_package: Dict[str, Any],
+    user_id: str,
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    The main orchestrator. Handles both Search/RAG and Direct Answer paths,
-    uses unified retrieval, and handles high-fidelity MongoDB logging for memory.
-    """
-    # Initialize as empty; will be populated if search is required
-
+    """Streams the answer path, then stores the completed turn for memory."""
     total_start = time.perf_counter()
 
-    sources_for_log = [] 
+    sources_for_log = []
 
     try:
         full_markdown_response = ""
         yield {"event": "analysis_complete", "data": {"path": path}}
         
         if path == "direct_answer":
-            print("✅ [ORCHESTRATOR] Executing Direct Answer path.")
+            print("[ORCHESTRATOR] Executing direct answer path.")
             yield {"event": "steps", "data": {"message": "Generating answer..."}}
             
             conversation_history = _format_context_for_prompt(context_package)
@@ -889,110 +844,157 @@ async def generate_and_stream_answer(
             
             yield {"event": "synthesis_start", "data": {}}
             
-            # These 4 lines MUST be indented inside the if block
             direct_model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
-            response_stream = await direct_model.generate_content_async(direct_prompt, stream=True)
-            async for chunk in response_stream:
+            response_stream = await with_timeout(
+                direct_model.generate_content_async(direct_prompt, stream=True),
+                settings.PROVIDER_TIMEOUT_SECONDS,
+                "Gemini direct answer",
+                "The answer model is taking too long. Please try again.",
+            )
+            async for chunk in iter_with_timeout(
+                response_stream,
+                settings.GEMINI_STREAM_TIMEOUT_SECONDS,
+                "Gemini direct answer",
+                "The answer stream stopped responding. Please try again.",
+            ):
                 if chunk.text:
                     full_markdown_response += chunk.text
                     yield {"event": "markdown_chunk", "data": {"chunk": chunk.text}}
 
-        else:  # path == "search_required"
-            print("⚡ [ORCHESTRATOR] Executing FAST SEARCH path.")
+        else:
+            print("[ORCHESTRATOR] Executing search path.")
             yield {"event": "steps", "data": {"message": "Searching the web..."}}
 
-            # STEP 1: Start image search in background
             image_task = asyncio.create_task(_get_images_from_tavily_async(prompt))
 
-            # STEP 2: Fast Tavily text search
             tavily_response = await _search_tavily_async(prompt)
             tavily_results = tavily_response.get("results", [])
             tavily_instant_answer = tavily_response.get("answer")
+            provider_error = tavily_response.get("provider_error")
+            use_search_results = not provider_error
 
-            # STEP 3: Instant summary from Tavily
-            if tavily_instant_answer:
-                yield {"event": "steps", "data": {"message": "Found quick results..."}}
-                instant_header = f"> **Quick Summary:** {tavily_instant_answer}\n\n---\n\n"
-                full_markdown_response += instant_header
-                yield {"event": "markdown_chunk", "data": {"chunk": instant_header}}
+            if provider_error:
+                yield {"event": "provider_warning", "data": {"message": provider_error}}
+                path = "direct_answer"
+                conversation_history = _format_context_for_prompt(context_package)
+                fallback_prompt = f"Conversation History:\n{conversation_history}\n\nUser's Question: {prompt}"
+                direct_model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+                response_stream = await with_timeout(
+                    direct_model.generate_content_async(fallback_prompt, stream=True),
+                    settings.PROVIDER_TIMEOUT_SECONDS,
+                    "Gemini fallback answer",
+                    "The fallback answer model is taking too long. Please try again.",
+                )
+                async for chunk in iter_with_timeout(
+                    response_stream,
+                    settings.GEMINI_STREAM_TIMEOUT_SECONDS,
+                    "Gemini fallback answer",
+                    "The fallback answer stream stopped responding. Please try again.",
+                ):
+                    if chunk.text:
+                        full_markdown_response += chunk.text
+                        yield {"event": "markdown_chunk", "data": {"chunk": chunk.text}}
+                images = await image_task
+                if images:
+                    yield {"event": "images", "data": {"images": images}}
 
-            # STEP 4: Wait for images
-            images = await image_task
-            if images:
-                print(f"  🖼️ [ORCHESTRATOR] Found {len(images)} images.")
-                yield {"event": "images", "data": {"images": images}}
+            if use_search_results:
+                if tavily_instant_answer:
+                    yield {"event": "steps", "data": {"message": "Found quick results..."}}
+                    instant_header = f"> **Quick Summary:** {tavily_instant_answer}\n\n---\n\n"
+                    full_markdown_response += instant_header
+                    yield {"event": "markdown_chunk", "data": {"chunk": instant_header}}
 
-            # STEP 5: Build scraped_data properly
-            scraped_data = [
-                {
-                    "source": res.get("url", ""),
-                    "title": res.get("title", "Untitled"),
-                    "content": res.get("content", "")
-                }
-                for res in tavily_results
-            ]
+                images = await image_task
+                if images:
+                    logger.info("Found %s image results.", len(images))
+                    yield {"event": "images", "data": {"images": images}}
 
-            # Populate sources_for_log for DB
-            sources_for_log = [
-                {
-                    "title": item["title"],
-                    "url": item["source"],
-                    "content": item["content"]
-                }
-                for item in scraped_data
-            ]
+                scraped_data = [
+                    {
+                        "source": res.get("url", ""),
+                        "title": res.get("title", "Untitled"),
+                        "content": res.get("content", "")
+                    }
+                    for res in tavily_results
+                ]
 
-            # Send sources to UI — use "source" key which holds the url
-            sources_for_ui = [
-                {"title": item["title"], "url": item["source"]}
-                for item in scraped_data
-            ]
-            yield {"event": "sources", "data": {"sources": sources_for_ui}}
+                sources_for_log = [
+                    {
+                        "title": item["title"],
+                        "url": item["source"],
+                        "content": item["content"]
+                    }
+                    for item in scraped_data
+                ]
 
-            # STEP 6: Gemini synthesis
-            yield {"event": "steps", "data": {"message": "Synthesizing full cited answer..."}}
-            yield {"event": "synthesis_start", "data": {}}
+                sources_for_ui = [
+                    {"title": item["title"], "url": item["source"]}
+                    for item in scraped_data
+                ]
+                yield {"event": "sources", "data": {"sources": sources_for_ui}}
 
-            async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
-                if chunk:
-                    full_markdown_response += chunk
-                    yield {"event": "markdown_chunk", "data": {"chunk": chunk}}
+                yield {"event": "steps", "data": {"message": "Synthesizing full cited answer..."}}
+                yield {"event": "synthesis_start", "data": {}}
 
-        # ── POST-PROCESSING: runs for BOTH paths ──
+                async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
+                    if chunk:
+                        full_markdown_response += chunk
+                        yield {"event": "markdown_chunk", "data": {"chunk": chunk}}
+
         if full_markdown_response.strip():
             yield {"event": "steps", "data": {"message": "Generating interactive UI..."}}
-            print("✅ [ORCHESTRATOR] Running Thesys + Metadata in PARALLEL...")
+            print("[ORCHESTRATOR] Running UI generation and metadata.")
 
             async def _run_thesys():
-                return await generate_ui_spec_from_markdown(full_markdown_response, context_package)
+                try:
+                    return await generate_ui_spec_from_markdown(full_markdown_response, context_package)
+                except Exception as exc:
+                    logger.warning("Interactive UI fallback used: %s", exc)
+                    return "<C1><P>Interactive UI generation is temporarily unavailable. The Markdown answer is still available.</P></C1>"
 
             async def _run_metadata():
-                if turn_number == 1:
-                    t, s, e = await asyncio.gather(
-                        _generate_chat_title(prompt),
-                        _generate_summary(full_markdown_response),
-                        _extract_entities(full_markdown_response)
-                    )
-                else:
-                    t = None
-                    s, e = await asyncio.gather(
-                        _generate_summary(full_markdown_response),
-                        _extract_entities(full_markdown_response)
-                    )
-                return t, s, e
+                try:
+                    if turn_number == 1:
+                        t, s, e = await with_timeout(
+                            asyncio.gather(
+                                _generate_chat_title(prompt),
+                                _generate_summary(full_markdown_response),
+                                _extract_entities(full_markdown_response),
+                            ),
+                            settings.METADATA_TIMEOUT_SECONDS,
+                            "Gemini metadata",
+                            "Response metadata generation is taking too long.",
+                        )
+                    else:
+                        t = None
+                        s, e = await with_timeout(
+                            asyncio.gather(
+                                _generate_summary(full_markdown_response),
+                                _extract_entities(full_markdown_response),
+                            ),
+                            settings.METADATA_TIMEOUT_SECONDS,
+                            "Gemini metadata",
+                            "Response metadata generation is taking too long.",
+                        )
+                    return t, s, e
+                except Exception as exc:
+                    logger.warning("Metadata fallback used: %s", exc)
+                    return (prompt[:50] if turn_number == 1 else None), "A response was generated.", []
 
             (raw_dsl_string, (title, summary, entities)) = await asyncio.gather(
                 _run_thesys(),
-                _run_metadata()
+                _run_metadata(),
             )
 
-            print("✅ [ORCHESTRATOR] Thesys + Metadata both complete.")
+            print("[ORCHESTRATOR] UI generation and metadata complete.")
 
             yield {"event": "aui_dsl", "data": raw_dsl_string}
             await asyncio.sleep(0.1)
             yield {"event": "turn_metadata", "data": {"summary": summary, "entities": entities}}
 
             log_data = {
+                "user_id": user_id,
                 "session_id": session_id,
                 "turn_number": turn_number,
                 "user_query": prompt,
@@ -1013,19 +1015,16 @@ async def generate_and_stream_answer(
             yield {"event": "error", "data": {"message": "Failed to generate a valid response."}}
 
             
+    except ProviderError as e:
+        logger.warning("Provider error from %s: %s", e.provider, e.public_message)
+        yield {"event": "error", "data": {"message": e.public_message, "provider": e.provider}}
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        yield {"event": "error", "data": {"message": f"An unexpected error occurred: {str(e)}"}}
+        logger.exception("Unexpected stream error: %s", e)
+        yield {"event": "error", "data": {"message": "ARGON hit an unexpected server issue. Please try again."}}
     
     finally:
         total = time.perf_counter() - total_start     
-        print(f"\n{'='*50}")
-        print(f"  ⏱  PHASE TIMING SUMMARY")
-        print(f"  ⏱  TOTAL END-TO-END : {total:.2f}s")
-        print(f"{'='*50}\n")
-
-        print("✅ [ORCHESTRATOR] Stream finished.")
+        logger.info("Stream finished in %.2fs.", total)
         yield {"event": "finished", "data": {"message": "Stream completed."}}
 
 
@@ -1072,7 +1071,7 @@ async def _generate_summary(markdown_content: str) -> str:
         print(f"    - Summary created: \"{summary}\"")
         return summary
     except Exception as e:
-        print(f"    - 🚨 Error generating summary: {e}")
+        print(f"[METADATA] Error generating summary: {e}")
         return "A response was generated." 
 
 async def _extract_entities(markdown_content: str) -> List[str]:
@@ -1101,7 +1100,7 @@ async def _extract_entities(markdown_content: str) -> List[str]:
         print(f"    - Entities extracted: {entities}")
         return entities
     except Exception as e:
-        print(f"    - 🚨 Error extracting entities: {e}")
+        print(f"[METADATA] Error extracting entities: {e}")
         return [] 
 
 async def _generate_chat_title(user_query: str) -> str:
@@ -1134,7 +1133,7 @@ async def _generate_chat_title(user_query: str) -> str:
         return title
         
     except Exception as e:
-        print(f"    - 🚨 Error generating dedicated title: {e}")
+        print(f"[METADATA] Error generating chat title: {e}")
 
         return user_query[:50]
     
@@ -1146,12 +1145,13 @@ async def _log_turn_to_db(log_data: dict):
     created, this will create it. Otherwise, it updates the existing placeholder.
     """
     if conversations_collection is None:
-        print("🚨 [DB_LOG] Cannot log turn: conversations_collection is not available.")
+        print("[DB_LOG] Cannot log turn: conversations_collection is not available.")
         return
     
     try:
 
         query_filter = {
+            "user_id": log_data["user_id"],
             "session_id": log_data["session_id"],
             "turn_number": log_data["turn_number"]
         }
@@ -1161,6 +1161,6 @@ async def _log_turn_to_db(log_data: dict):
 
         await conversations_collection.update_one(query_filter, update_data, upsert=True)
         
-        print(f"✅ [DB_LOG] Successfully logged/updated turn {log_data['turn_number']} for session {log_data['session_id']}")
+        print(f"[DB_LOG] Successfully logged/updated turn {log_data['turn_number']} for session {log_data['session_id']}")
     except Exception as e:
-        print(f"🚨 [DB_LOG] Failed to log/update turn to MongoDB: {e}")
+        print(f"[DB_LOG] Failed to log/update turn to MongoDB: {e}")

@@ -1,757 +1,641 @@
-<div align="center">
-<br/>
-<h1>🌟 ARGON - AI-Powered Search & Synthesis Engine</h1>
-<strong>An advanced AI research assistant that combines intelligent routing, parallel web search, and dynamic UI generation into a seamless, conversational experience.</strong>
-<br/>
-<br/>
-</div>
+# ARGON
 
+**AI-powered search, synthesis, and interactive answer rendering.**
 
-ARGON is a sophisticated AI-powered research assistant that revolutionizes how users interact with information. Built on a state-of-the-art Retrieval-Augmented Generation (RAG) architecture, it intelligently decides whether to answer from its base knowledge or perform real-time web searches. It then synthesizes findings into interactive, citation-backed responses, all streamed to the user in real-time.
+![React](https://img.shields.io/badge/Frontend-React-61DAFB?style=for-the-badge&logo=react&logoColor=111)
+![Django](https://img.shields.io/badge/Backend-Django-092E20?style=for-the-badge&logo=django&logoColor=white)
+![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Gemini](https://img.shields.io/badge/LLM-Gemini-8E75B7?style=for-the-badge&logo=google&logoColor=white)
+![Vite](https://img.shields.io/badge/Build-Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 
-📋 Table of Contents
+ARGON is a Perplexity-style research assistant built with a Django backend and a React frontend. It decides whether a user question needs live web search, retrieves relevant sources with Tavily, streams a cited Markdown answer from Gemini, transforms the answer into an interactive UI with Thesys C1, and stores conversation memory in MongoDB.
 
-Overview
+The project is designed to show more than a chatbot. It demonstrates request routing, retrieval-augmented generation, streaming UX, source attribution, image search, persistent sessions, voice input, and deployable full-stack architecture.
 
-Key Features
+> 💡 **Interview-friendly summary:** ARGON is a full-stack AI search product with routing, retrieval, streaming, memory, and interactive answer rendering.
 
-Intelligent Query Classification
+---
 
-Parallel Web Search & Scraping
+## ✨ Quick Preview
 
-RAG-Based Synthesis
+| Layer | What It Does |
+| --- | --- |
+| 🎛️ Frontend | React + Vite chat interface, live streaming Markdown, tabbed answer/source/image views |
+| ⚙️ Backend | Django async endpoints, SSE streaming, routing, retrieval, synthesis, metadata generation |
+| 🔎 Search | Tavily web search and image search |
+| 🧠 LLM | Gemini for routing, direct answers, cited synthesis, summaries, titles, and entities |
+| 🎨 UI Generation | Thesys C1 DSL rendered with `@thesysai/genui-sdk` |
+| 🗃️ Memory | MongoDB session storage with summaries and entities for follow-up context |
 
-Interactive UI Generation
+---
 
-Conversation Memory System
+## 🧭 Table Of Contents
 
-Image Search Integration
+- [Core Idea](#core-idea)
+- [Feature Highlights](#feature-highlights)
+- [Architecture](#architecture)
+- [Request Lifecycle](#request-lifecycle)
+- [Backend Design](#backend-design)
+- [Frontend Design](#frontend-design)
+- [Database Schema](#database-schema)
+- [API Reference](#api-reference)
+- [Local Setup](#local-setup)
+- [Deployment Guide](#deployment-guide)
+- [Environment Variables](#environment-variables)
+- [Known Improvements](#known-improvements)
 
-System Architecture
+---
 
-High-Level Flow
+## 🎯 Core Idea
 
-Request-Response Lifecycle
+Most AI chat apps use a single path for every prompt. ARGON uses a routed pipeline:
 
-Technology Stack
+1. Understand the user query.
+2. Decide whether live search is needed.
+3. If search is needed, retrieve web and image results.
+4. Synthesize a cited answer from retrieved context.
+5. Stream the answer as Markdown.
+6. Generate an interactive C1 UI from the final answer.
+7. Save the turn to MongoDB for future context.
 
-Installation Guide
+This makes the experience fast for simple questions and more grounded for current, factual, or source-sensitive questions.
 
-Prerequisites
+```text
+Simple question       -> Direct Gemini answer
+Fresh/current topic   -> Tavily search + cited Gemini synthesis
+Completed response    -> Thesys C1 UI + MongoDB memory
+```
 
-Backend Setup
+---
 
-Frontend Setup
+## 🚀 Feature Highlights
 
-Configuration
+### 🧠 Intelligent Routing
 
-Usage
+ARGON runs a three-stage routing pipeline before answering:
 
-API Documentation
+- **Fast metadata extraction** identifies temporal wording, factual lookups, attached content, volatile domains, and generation intent.
+- **NLP + LLM classification** uses spaCy and Gemini to classify the prompt into intent, entity type, scope, and verification need.
+- **Weighted decision logic** chooses either `direct_answer` or `search_required`.
 
-Frontend Components
+The routing score is deterministic once the classifier output is available:
 
-Backend Services
-
-Database Schema
-
-Contributing & License
-
-🎯 Overview
-
-At its core, ARGON is designed to be more than just a chatbot. It's an intelligent partner for research and discovery. It understands the user's intent, fetches up-to-date information when needed, and presents it in the most intuitive and interactive way possible.
-
-What Makes ARGON Special?
-
-🧠 Intelligent Routing: A sophisticated 3-stage classification system analyzes every query to determine the optimal path for a high-quality answer, avoiding unnecessary web searches.
-
-⚡ Parallel Processing: Utilizes Python's asyncio to execute web searches, image retrieval, and content scraping concurrently, dramatically reducing wait times.
-
-🎨 Interactive UI Generation: Goes beyond simple Markdown by using the Thesys API to transform responses into rich, dynamic user interfaces with tabs, grids, and interactive elements.
-
-💬 Contextual Memory: Maintains a coherent conversation by generating summaries and extracting key entities from each turn, ensuring follow-up questions are understood correctly.
-
-🔍 Real-time Streaming: A fully event-driven architecture using Server-Sent Events (SSE) provides a live "typing" effect and a step-by-step view of the entire process.
-
-📊 Visual Insights: Integrates parallel image search to supplement text-based answers with a visually engaging and informative image grid.
-
-🎤 Voice Input: Supports modern browser-native speech recognition for hands-free interaction.
-
-✨ Key Features
-1. Intelligent Query Classification
-
-ARGON employs a three-stage pipeline to route queries with precision, ensuring speed for simple questions and depth for complex ones.
-
-Stage 1: Contextual Metadata Extraction
-
-A set of rule-based, sub-millisecond checks to quickly identify key query attributes.
-
-Detects: attached code/text, temporal keywords (latest, today), volatile domains (stock, weather), and generation tasks (write, create).
-
-Returns 6 boolean flags for initial, rapid decision-making.
-
-Stage 2: NLP Feature Generation
-
-Uses spaCy for linguistic analysis (entity recognition, root verb extraction).
-
-Leverages a fast LLM (Gemini 2.5 Flash) for semantic classification based on metadata, linguistic features, and conversation history.
-
-Maps classifications to numerical scores (0-1) across 6 dimensions: Intent Type, Entity Dynamism, Temporal Urgency, Context Dependency, Verification Need, and Comprehensiveness.
-
-Stage 3: Weighted Decision
-
-A deterministic final step that applies weights to the scores to calculate a final decision value. The negative weight for context_dependency is crucial for handling follow-up questions correctly.
-
-code
-Python
-download
-content_copy
-expand_less
-# From services.py
+```python
 decision_score = (
-    scores['intent_type_score'] * 0.32 +
-    scores['entity_dynamism_score'] * 0.20 +
-    scores['temporal_urgency_score'] * 0.20 +
-    scores['context_dependency_score'] * -0.25 +  # High context dependency penalizes the score!
-    scores['verification_need_score'] * 0.18 +
-    scores['comprehensiveness_score'] * 0.05
+    scores["intent_type_score"] * 0.32 +
+    scores["entity_dynamism_score"] * 0.20 +
+    scores["temporal_urgency_score"] * 0.20 +
+    scores["context_dependency_score"] * -0.25 +
+    scores["verification_need_score"] * 0.18 +
+    scores["comprehensiveness_score"] * 0.05
 )
+```
 
-# Threshold: 0.50
-path = "search_required" if decision_score > 0.50 else "direct_answer"
-2. Parallel Web Search & Scraping
+### ⚡ Live Streaming UX
 
-When a web search is required, ARGON executes a high-performance, multi-threaded retrieval pipeline.
+The backend returns a `text/event-stream` response. The frontend reads SSE chunks using `ReadableStream`, reconstructs event blocks, and updates the latest chat turn in real time.
 
-Query Generation:
+Key events include:
 
-Uses Gemini to decompose the user's prompt into 3-5 focused search queries.
+- `analysis_complete`
+- `steps`
+- `sources`
+- `images`
+- `synthesis_start`
+- `markdown_chunk`
+- `aui_dsl`
+- `turn_metadata`
+- `finished`
 
-Critically, it analyzes the conversation history to avoid generating queries for topics already discussed.
+### 🔎 Search And Source Grounding
 
-Concurrent Search:
+For search-required prompts, ARGON:
 
-Executes all generated search queries simultaneously using Tavily Search API and Python's asyncio.gather().
+- calls Tavily with advanced search,
+- retrieves a quick Tavily answer when available,
+- collects source titles, URLs, and snippets,
+- sends image results in parallel,
+- asks Gemini to synthesize a cited answer from retrieved source context.
 
-Results are streamed to the frontend as they arrive (source_found event), providing instant feedback.
+### 🎨 Interactive Answer Rendering
 
-URLs are de-duplicated and smartly limited to the top 7 most relevant sources.
+The final Markdown answer is sent to Thesys and transformed into C1 DSL. The frontend renders that output through:
 
-Parallel Scraping:
+```jsx
+<C1Component c1Response={response.auiSpec} />
+```
 
-Uses Crawl4AI to scrape all 7 source URLs in parallel. Crawl4AI can render JavaScript, ensuring content from modern websites is accessible.
+Users can switch between:
 
-Each scraping job has an aggressive 8-10 second timeout to prevent the system from getting stuck on a single slow site.
+- **Answer**: streamed Markdown response
+- **Interactive**: Thesys-generated C1 interface
+- **Sources**: clickable source cards
+- **Images**: Tavily image grid
+- **Steps**: backend progress timeline
 
-The system gracefully degrades, proceeding even if some sources fail to load, ensuring an answer is always provided if possible.
+### 🧩 Conversation Memory
 
-3. RAG-Based Synthesis
+Each completed turn is enriched with:
 
-ARGON's synthesis engine is designed to produce grounded, verifiable, and well-structured answers.
+- response summary,
+- important entities,
+- source list,
+- execution path,
+- full Markdown answer,
+- generated C1 response spec.
 
-Context Formatting: Scraped content is meticulously prepared for the LLM, clearly demarcating each source and its URL.
+The frontend sends a compact `context_package` on each new prompt so follow-up questions can reference prior turns without replaying the entire conversation.
 
-code
-Code
-download
-content_copy
-expand_less
-[Source 1: https://www.fifa.com/...]
-<Cleaned Markdown content from source 1>
+---
 
-[Source 2: https://en.wikipedia.org/wiki/...]
-<Cleaned Markdown content from source 2>
+## 🏗️ Architecture
 
-System Prompt Engineering: A detailed system prompt instructs the LLM (Gemini 2.5 Flash) to adhere to strict rules:
+```mermaid
+flowchart TD
+    A["React UI"] --> B["POST /api/generate/"]
+    B --> C{"Routing"}
+    C -->|"direct_answer"| D["Gemini Stream"]
+    C -->|"search_required"| E["Tavily Search"]
+    E --> F["Source Context"]
+    E --> G["Image Results"]
+    F --> H["Gemini Synthesis"]
+    D --> I["Markdown Stream"]
+    H --> I
+    I --> J["Thesys C1 UI"]
+    I --> K["Metadata"]
+    J --> L["MongoDB Save"]
+    K --> L
+    L --> M["SSE Events"]
+    M --> A
+```
 
-code
-Code
-download
-content_copy
-expand_less
-You are a world-class AI research assistant.
+### Routing Pipeline
 
-**Conversation History:**
-<Previous turns with summaries>
+```mermaid
+flowchart LR
+    A["User Prompt"] --> B["Metadata"]
+    B --> C["spaCy Features"]
+    C --> D["Gemini Classifier"]
+    D --> E["Weighted Score"]
+    E --> F{"Path"}
+    F --> G["Direct Answer"]
+    F --> H["Web Search"]
+```
 
-**Instructions:**
-1. Answer ONLY from the provided sources.
-2. Cite EVERY claim with [1], [2] markers.
-3. Use beautiful Markdown formatting.
-4. If info is insufficient, state that clearly.
+### Search And Synthesis Flow
 
-Streaming Response: The final answer is generated token-by-token and streamed directly to the frontend, creating the live "typing" effect that makes the application feel incredibly responsive.
+```mermaid
+flowchart TD
+    A["User Query"] --> B["Tavily Web Search"]
+    A --> C["Tavily Image Search"]
+    B --> D["Source Snippets"]
+    D --> E["Prompt Builder"]
+    E --> F["Gemini Cited Answer"]
+    F --> G["Markdown Chunks"]
+    G --> H["Thesys C1 Transform"]
+    C --> I["Images Tab"]
+```
 
-4. Interactive UI Generation
+These diagrams intentionally use short labels to keep GitHub Mermaid rendering clean and avoid overlapping nodes.
 
-ARGON transforms the final Markdown response into a rich, interactive interface using the Thesys API.
+---
 
-Markdown to DSL: The complete Markdown answer is sent to the Thesys API.
+## 🔄 Request Lifecycle
 
-code
-Python
-download
-content_copy
-expand_less
-# services.py - Thesys Chat API call
-payload = {
-    "model": "c1-latest",
-    "messages": [{
-        "role": "user",
-        "content": f"Transform this Markdown into the best possible UI:\n{markdown_content}"
-    }]
-}
-# Output: A multi-line C1 Domain-Specific Language (DSL) string
+### 1. User submits a prompt
 
-Frontend Rendering: The returned C1 DSL is rendered by the @thesysai/genui-sdk React component, which automatically creates a beautiful layout with tabs, source cards, image grids, and rich text formatting.
+The frontend builds a request payload:
 
-5. Conversation Memory System
-
-ARGON maintains context across multiple turns using a multi-level memory architecture stored in MongoDB.
-
-Turn 1 (Session Creation): When a new chat starts, dedicated metadata is generated and stored.
-
-code
-Python
-download
-content_copy
-expand_less
-# services.py - Executed only on the first turn
-title = _generate_chat_title(prompt)    # e.g., "Theory of Relativity & GPS"
-summary = _generate_summary(response)   # A one-sentence summary for context
-entities = _extract_entities(response)  # e.g., ["Einstein", "GPS", "Time Dilation"]
-
-Turn 2+ (Context Updates): For subsequent turns, only the summary and entities are regenerated to inform the ongoing conversation.
-
-Context Package Assembly: On every request, the frontend assembles the conversation history into a context_package that is sent to the backend. This package is used at every stage of the pipeline to ensure context-aware responses.
-
-code
-JavaScript
-download
-content_copy
-expand_less
-// App.jsx
-const context_package = {
-    current_query: prompt,
-    previous_turns: chatHistory.map(turn => ({
-        query: turn.prompt,
-        summary: turn.summary,
-        entities: turn.entities
-    }))
-};
-6. Image Search Integration
-
-To provide a richer, more visual experience, ARGON fetches relevant images in parallel with its text search.
-
-Concurrent Execution: The image search task runs simultaneously with the text URL retrieval.
-
-code
-Python
-download
-content_copy
-expand_less
-# services.py
-image_results_task = _get_images_from_tavily_async(queries[0])
-text_urls_task = get_urls_from_queries(queries)
-
-# Both complete at roughly the same time
-images, urls = await asyncio.gather(image_results_task, text_urls_task)
-
-Frontend Display:
-
-Images are displayed in a dedicated "Images" tab.
-
-A dynamic CSS Grid creates beautiful, responsive layouts for different numbers of images.
-
-Features a slick, in-place zoom effect on click, which blurs and fades non-selected images for focus.
-
-🏗️ System Architecture
-High-Level Flow
-code
-Mermaid
-download
-content_copy
-expand_less
-graph TD
-    A[User UI <br/>(React)] -->|POST /api/generate/| B(Django Backend);
-    subgraph B
-        C{Intelligent Router} -->|Direct| D[Direct Answer <br/>(Gemini Stream)];
-        C -->|Search| E[Search Path <br/>(RAG Pipeline)];
-    end
-    subgraph E
-        F(Query Generation) --> G(Parallel Processing);
-        subgraph G
-            direction LR
-            G1(Web Search <br/>Tavily)
-            G2(Image Search <br/>Tavily)
-            G3(Content Scraping <br/>Crawl4AI)
-        end
-        G --> H(Synthesis <br/>Gemini Streaming);
-    end
-    D --> I(UI Generation <br/>Thesys API);
-    H --> I;
-    I --> J(Metadata Generation);
-    J --> K(MongoDB Logging);
-    K --> |SSE Stream| L(Frontend Event Handlers);
-    L --> A;
-
-style B fill:#222,stroke:#3b82f6,stroke-width:2px;
-style E fill:#333,stroke:#60a5fa,stroke-width:1px;
-style G fill:#333,stroke:#60a5fa,stroke-width:1px;
-Request-Response Lifecycle
-
-A typical "search_required" request flows through the system as follows:
-
-User Submits Query: The React frontend sends a JSON payload to the backend.
-
-code
-JavaScript
-download
-content_copy
-expand_less
-// App.jsx
+```js
 const requestPayload = {
-    prompt: "Tell me about the 2026 FIFA World Cup",
-    session_id: "uuid-here",
-    turn_number: 1,
-    context_package: { previous_turns: [] },
-    force_web_search: false
+  prompt: currentPrompt,
+  session_id: currentSessionId,
+  turn_number: chatHistory.length + 1,
+  context_package,
+  force_web_search: forceWebSearch,
 };
-fetch('/api/generate/', { method: 'POST', body: JSON.stringify(requestPayload) });
+```
 
-Backend Routing Decision: The intelligent router analyzes the prompt and determines the path.
+### 2. Backend chooses a path
 
-code
-Code
-download
-content_copy
-expand_less
-# Result: "search_required" (Decision Score: 0.72)
+If the user forces web search, the backend uses `search_required`. Otherwise it runs the intelligent routing pipeline.
 
-SSE Stream Begins: The backend opens a StreamingHttpResponse and the frontend starts listening for events. The first event indicates the chosen path.
+```python
+if force_web_search:
+    path = "search_required"
+else:
+    path = await services.get_intelligent_path(prompt, context_package)
+```
 
-code
-Code
-download
-content_copy
-expand_less
-event: analysis_complete
-data: {"path": "search_required"}
+### 3. Backend streams progress
 
-Parallel Execution & Live Events: The backend performs searches and scraping, sending progress events to the frontend in real-time.
+The response is a `StreamingHttpResponse`:
 
-code
-Code
-download
-content_copy
-expand_less
-event: query_generated
-data: {"query": "2026 FIFA World Cup host cities"}
-...
-event: source_found
-data: {"count": 7}
-...
-event: images
-data: {"images": ["url1.jpg", "url2.jpg"]}
-...
-event: scraping_start
-data: {"domain": "fifa.com"}
+```python
+response = StreamingHttpResponse(
+    sse_stream,
+    content_type="text/event-stream"
+)
+```
 
-Synthesis & UI Generation: The synthesized Markdown is converted to a C1 DSL string.
+### 4. Frontend updates the active turn
 
-Final Payload Stream: The UI spec and conversational metadata are sent.
+The frontend parses SSE blocks and updates only the latest chat item. Markdown chunks are flushed immediately for a live typing effect.
 
-code
-Code
-download
-content_copy
-expand_less
-event: aui_dsl
-data: <C1>
-data: <P>The 2026 FIFA World Cup will be hosted across...</P>
-data: </C1>
+### 5. Metadata and UI spec are saved
 
-event: turn_metadata
-data: {"summary": "The 2026 World Cup will be held in...", "entities": ["FIFA", ...]}
+After the answer finishes, the backend generates:
 
-Database Logging: The complete turn data, including the UI spec and metadata, is saved to MongoDB.
+- C1 UI spec,
+- chat title,
+- summary,
+- entities.
 
-Stream Closes: The finished event is sent, and the connection is closed.
+Then it upserts the completed turn in MongoDB.
 
-🛠️ Technology Stack
-Category	Technology	Version/Provider	Purpose
-Backend	Python	3.11+	Core programming language
-	Django	5.0+	Asynchronous web framework and URL routing
-	Django REST Framework	3.14+	Building robust APIs
-	Motor	3.3+	Asynchronous MongoDB driver
-	MongoDB	7.0+	Storage for conversation history and metadata
-	spaCy	3.7+	NLP for linguistic feature extraction
-	httpx	0.25+	High-performance async HTTP client
-Frontend	React	18.3+	UI library for building the user interface
-	Vite	5.0+	Modern, fast frontend build tool and dev server
-	Framer Motion	10.16+	Declarative animations for a fluid user experience
-	react-textarea-autosize	8.5+	Auto-expanding prompt input area
-APIs	Google Generative AI	google-generativeai	Gemini 2.5 Flash for classification & synthesis
-	Tavily Search API	tavily-python	High-quality web and image search results
-	Crawl4AI	crawl4ai	Headless browser for JavaScript-enabled scraping
-	Thesys AI	@thesysai/genui-sdk	Markdown to Interactive UI (C1 DSL) transformation
-📦 Installation Guide
-Prerequisites
+---
 
-Python 3.11+ with pip
+## ⚙️ Backend Design
 
-Node.js 18+ with npm
+Backend path:
 
-MongoDB 7.0+ (running locally or a cloud instance like Atlas)
+```text
+backend/
+  manage.py
+  core/
+    settings.py
+    urls.py
+    asgi.py
+    wsgi.py
+  api/
+    views.py
+    urls.py
+    services.py
+    db_config.py
+```
 
-API Keys from:
+### Important Files
 
-Google AI Studio (Gemini)
+| File | Responsibility |
+| --- | --- |
+| `backend/core/settings.py` | Django settings, CORS, environment loading |
+| `backend/api/views.py` | HTTP endpoints, request validation, streaming response setup |
+| `backend/api/services.py` | Routing, search, synthesis, Thesys conversion, metadata, SSE formatting |
+| `backend/api/db_config.py` | MongoDB connection using Motor |
+| `backend/api/urls.py` | API route definitions |
 
-Tavily
+### Backend Routes
 
-Thesys AI
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/generate/` | Generate and stream an AI response |
+| `GET` | `/api/sessions/` | Fetch saved chat sessions |
+| `GET` | `/api/sessions/<session_id>/` | Fetch one session's full history |
+| `DELETE` | `/api/sessions/<session_id>/` | Delete a session |
 
-Backend Setup
+---
 
-Clone the Repository
+## 🖥️ Frontend Design
 
-code
-Bash
-download
-content_copy
-expand_less
-git clone https://github.com/your-username/ARGON.git
-cd ARGON/backend
+Frontend path:
 
-Create and Activate a Virtual Environment
+```text
+frontend/
+  src/
+    App.jsx
+    main.jsx
+    index.css
+    components/
+      WelcomeScreen.jsx
+      ResponseContainer.jsx
+      StreamingMarkdown.jsx
+      ProcessingTimeline.jsx
+      StepsTimeline.jsx
+      SourceCard.jsx
+      ImageGrid.jsx
+      Sidebar.jsx
+      landing/
+        ArgonCore.jsx
+        StarField.jsx
+```
 
-code
-Bash
-download
-content_copy
-expand_less
-# Create
-python -m venv venv
+### Important Components
 
-# Activate (macOS/Linux)
-source venv/bin/activate
+| Component | Responsibility |
+| --- | --- |
+| `App.jsx` | Global state, session restore, prompt submission, SSE parsing |
+| `WelcomeScreen.jsx` | Landing state before chat starts |
+| `ArgonCore.jsx` | Landing prompt input, example prompts, voice/search controls |
+| `ResponseContainer.jsx` | Per-turn display, tabs, error state |
+| `StreamingMarkdown.jsx` | Markdown rendering with citation badges and tooltips |
+| `ProcessingTimeline.jsx` | Live status UI while backend works |
+| `Sidebar.jsx` | Saved sessions, session loading, deletion |
+| `ImageGrid.jsx` | Click-to-focus image results |
+| `SourceCard.jsx` | Clickable source cards with favicons |
 
-# Activate (Windows)
-venv\Scripts\activate
+---
 
-Install Python Dependencies
+## 🗃️ Database Schema
 
-code
-Bash
-download
-content_copy
-expand_less
-pip install django djangorestframework django-cors-headers motor python-dotenv google-generativeai tavily-python crawl4ai spacy httpx
+ARGON stores conversation turns in MongoDB:
 
-Download spaCy Model
+```text
+Database: perplexity_clone_db
+Collection: conversations
+```
 
-code
-Bash
-download
-content_copy
-expand_less
-python -m spacy download en_core_web_sm
+Example document:
 
-Configure Environment Variables
-Create a file named .env in the backend/ directory and add your API keys:
-
-code
-Env
-download
-content_copy
-expand_less
-# LLM
-GOOGLE_API_KEY=your_gemini_api_key_here
-
-# Search & Scraping
-TAVILY_API_KEY=your_tavily_api_key_here
-
-# UI Generation
-THESYS_API_KEY=your_thesys_api_key_here
-
-# Database (for local MongoDB)
-MONGO_CONNECTION_STRING=mongodb://localhost:27017/
-
-Run Django Migrations
-
-code
-Bash
-download
-content_copy
-expand_less
-python manage.py migrate
-Frontend Setup
-
-Navigate to the Frontend Directory
-
-code
-Bash
-download
-content_copy
-expand_less
-cd ../frontend # From the backend/ directory
-
-Install Node.js Dependencies
-
-code
-Bash
-download
-content_copy
-expand_less
-npm install
-
-Configure Environment Variables
-Create a file named .env in the frontend/ directory:
-
-code
-Env
-download
-content_copy
-expand_less
-VITE_API_URL=http://127.0.0.1:8000/api/
-🚀 Usage
-
-To run the application for development, you'll need three terminal windows.
-
-Terminal 1: Start the Backend Server
-
-code
-Bash
-download
-content_copy
-expand_less
-cd backend
-source venv/bin/activate
-python manage.py runserver
-# Server will start on http://127.0.0.1:8000
-
-Terminal 2: Start the Frontend Server
-
-code
-Bash
-download
-content_copy
-expand_less
-cd frontend
-npm run dev
-# Application will be available at http://localhost:5173
-
-Terminal 3 (Optional): Start Local MongoDB
-If you are running MongoDB locally, ensure the service is active.
-
-code
-Bash
-download
-content_copy
-expand_less
-mongod --dbpath /path/to/your/data/directory
-
-Navigate to http://localhost:5173 in your browser to start using ARGON.
-
-⚙️ Configuration
-
-The system is designed to be tunable. Key configuration points are located in backend/api/services.py:
-
-Classifier Weights & Threshold: Adjust the weights in the CLASSIFIER_WEIGHTS dictionary to make the routing more or less sensitive to certain features. Lowering the DECISION_THRESHOLD will result in more web searches.
-
-Performance Limits: Modify MAX_URLS_TO_SCRAPE to control the trade-off between the number of sources and response time.
-
-LLM Models: You can easily swap gemini-2.5-flash for more powerful models like gemini-2.5-pro for the synthesis step, balancing cost and quality.
-
-📚 API Documentation
-POST /api/generate/
-
-The primary endpoint for generating an AI response.
-
-Request Body:
-
-code
-JSON
-download
-content_copy
-expand_less
+```json
 {
-    "prompt": "Your question here",
-    "session_id": "uuid-v4-string",
-    "turn_number": 1,
-    "context_package": { /* ... */ },
-    "force_web_search": false
+  "session_id": "uuid",
+  "turn_number": 1,
+  "user_query": "Who is the current CEO of OpenAI?",
+  "chat_title": "OpenAI CEO",
+  "response_summary": "The answer explains the current leadership of OpenAI.",
+  "entities_mentioned": ["OpenAI", "CEO"],
+  "full_response_spec": "<C1>...</C1>",
+  "full_markdown_response": "The current CEO is...",
+  "sources_used": [
+    {
+      "title": "Source title",
+      "url": "https://example.com",
+      "content": "Search result snippet"
+    }
+  ],
+  "execution_path": "search_required",
+  "created_at": "ISODate"
 }
+```
 
-Response: A text/event-stream of Server-Sent Events. See Request-Response Lifecycle for a detailed list of events.
+MongoDB is used for application memory. The local Django SQLite database is not the main product database.
 
-GET /api/sessions/
+---
 
-Fetches a list of all chat session titles.
+## 📡 API Reference
+
+### Generate Answer
+
+```http
+POST /api/generate/
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "prompt": "Tell me about the 2026 FIFA World Cup",
+  "session_id": "uuid",
+  "turn_number": 1,
+  "context_package": {
+    "current_query": "Tell me about the 2026 FIFA World Cup",
+    "previous_turns": []
+  },
+  "force_web_search": false
+}
+```
 
 Response:
 
-code
-JSON
-download
-content_copy
-expand_less
+```text
+Content-Type: text/event-stream
+```
+
+Example SSE event:
+
+```text
+event: markdown_chunk
+data: {"chunk":"The 2026 FIFA World Cup..."}
+```
+
+### List Sessions
+
+```http
+GET /api/sessions/
+```
+
+Response:
+
+```json
 [
-    {"session_id": "uuid-1", "title": "2026 FIFA World Cup"},
-    {"session_id": "uuid-2", "title": "Quantum Computing Basics"}
+  {
+    "session_id": "uuid",
+    "title": "Theory of Relativity"
+  }
 ]
+```
+
+### Get Session History
+
+```http
 GET /api/sessions/<session_id>/
+```
 
-Fetches the full turn-by-turn history for a specific session.
+Returns all saved turns for the selected session.
 
-Response: An array of turn objects formatted for the frontend.
+### Delete Session
 
+```http
 DELETE /api/sessions/<session_id>/
+```
 
-Deletes all database entries for a specific session.
+Response:
 
-Response (Success):
-
-code
-JSON
-download
-content_copy
-expand_less
-{"status": "success", "deleted_count": 3}
-🧩 Frontend Components
-
-The frontend is built with a modular, component-based architecture.
-
--   `App.jsx` (Root Component)
-    -   `Sidebar.jsx`
-        -   `New Chat Button`
-        -   `Chat History List`
-            -   `Delete Button` (on hover)
-    -   `WelcomeScreen.jsx` (Shown for new chats)
-        -   `StarField.jsx` (Animated background)
-        -   `ArgonCore.jsx` (Landing Page UI)
-    -   `Chat Area`
-        -   `ResponseContainer.jsx` (One for each turn in the conversation)
-            -   `User Prompt Bubble`
-            -   `ProcessingTimeline.jsx` (Displays during generation)
-            -   **Tabbed Interface** (Displays after completion)
-                -   `C1Component` (Renders the interactive "Answer" tab)
-                -   `SourceCard.jsx` (Used in the "Sources" tab)
-                -   `ImageGrid.jsx` (Used in the "Images" tab)
-
-App.jsx: The root component managing all major state (chat history, session ID, loading status) and handling the SSE stream processing.
-
-Sidebar.jsx: Manages the display of past conversations, session loading, and session deletion.
-
-ResponseContainer.jsx: A crucial component that conditionally renders either the ProcessingTimeline while the backend is working or the final tabbed answer view upon completion.
-
-ProcessingTimeline.jsx: Listens to progress events from the backend to display a real-time, step-by-step view of the generation process.
-
-🔧 Backend Services
-
-All business logic is encapsulated in backend/api/services.py, which acts as the application's brain.
-
-Orchestration (generate_and_stream_answer): The main orchestrator function that calls all other services in sequence, manages the search vs. direct answer paths, and yields SSE events.
-
-Intelligent Routing Pipeline: A collection of functions (extract_contextual_metadata, generate_nlp_features_and_scores, make_routing_decision) that work together to decide the execution path.
-
-RAG Pipeline: A suite of async functions (generate_search_queries, get_urls_from_queries, scrape_urls_in_parallel, _synthesize_answer_from_context) that perform the complete search and synthesis process.
-
-Metadata Generation: A set of helper functions (_generate_summary, _extract_entities, _generate_chat_title) that run concurrently at the end of the process to enrich the data for storage and future context.
-
-💾 Database Schema
-
-ARGON uses a single MongoDB collection named conversations to store all chat data. Each document in the collection represents a single turn in a conversation.
-
-Collection: perplexity_clone_db.conversations
-
-Document Schema:
-
-code
-JSON
-download
-content_copy
-expand_less
+```json
 {
-  "_id": ObjectId("..."),
-  "session_id": "string (uuid-v4)",
-  "turn_number": "integer",
-  "user_query": "string",
-  "chat_title": "string (only exists on turn_number: 1)",
-  "response_summary": "string (one-sentence summary of the AI's response)",
-  "entities_mentioned": ["array", "of", "strings"],
-  "full_response_spec": "string (the raw C1 DSL from Thesys)",
-  "sources_used": [
-    {"title": "string", "url": "string"}
-  ],
-  "execution_path": "string ('search_required' or 'direct_answer')",
-  "created_at": "ISODate"
+  "status": "success",
+  "deleted_count": 3
 }
-
-🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a pull request or open an issue for bugs, feature requests, or suggestions.
-
-
-🗺️ Detailed Architecture Diagrams
-To better visualize the internal workings of ARGON, the following diagrams illustrate the core data flows for query processing and content generation.
-Intelligent Routing Pipeline
-This diagram illustrates the sophisticated three-stage intelligent routing pipeline. This system is the "brain" that analyzes each user query to determine the most efficient and effective path for a response, deciding between a direct LLM answer and a full, web-augmented search. The flowchart shows the journey from initial, rapid metadata extraction to the final weighted decision.
-code
-
-## 🧠 Intelligent Routing Pipeline
-
-```mermaid
-%% Top-to-Down flowchart
-graph TD
-
-    A["User Query:<br/>'Who is the CEO of OpenAI?'"]
-    B{"Stage 1: Metadata Extraction <br/>(0.5ms)"}
-    C["has_attached_content: <b>False</b><br/>is_temporal: <b>False</b><br/>is_factual_lookup: <b>True ✅</b>"]
-    D{"Stage 2: NLP Analysis <br/>(200ms)"}
-    E["spaCy entities: ['OpenAI']<br/>Gemini classification"]
-    F{"Stage 3: Weighted Decision"}
-    G["intent_type: factual_explanation (0.9)<br/>entity_dynamism: specific_person (0.9)<br/>verification_need: high (0.9)<br/><b>Final Score: 0.72 > 0.50</b>"]
-    H["Path Decided:<br/><b>search_required ✅</b>"]
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> H
-
-    style A fill:#1e1e1e,stroke:#fff,stroke-width:1px
-    style H fill:#1e1e1e,stroke:#2ecc71,stroke-width:2px
 ```
 
+---
 
-## 🔄 RAG Pipeline Data Flow
+## 🛠️ Local Setup
 
-```mermaid
-graph TD
+### Prerequisites
 
-    A[Scraped Content]
-    C[Gemini Streaming Response]
-    D["Token 1: 'The'<br/>Token 2: ' 2026'<br/>Token 3: ' FIFA'<br/>..."]
-    E(Full Markdown Answer)
-    F(Thesys UI Transformation <br/> Markdown → C1 DSL)
-    G(Interactive UI Component)
+- Python 3.11+
+- Node.js 18+
+- MongoDB Atlas or local MongoDB
+- Google Gemini API key
+- Tavily API key
+- Thesys API key
 
-    subgraph B [Synthesis Prompt Construction]
-        B1["<b>System Prompt:</b><br/>'You are a research assistant...<br/>Answer ONLY from these sources...'"]
-        B2["<b>Context:</b><br/>[Source 1: fifa.com]...<br/>[Source 2: wiki.com]..."]
-        B3["<b>User Query:</b><br/>'Tell me about 2026...'"]
-    end
+### Backend Setup
 
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
-
-    style G fill:#1e1e1e,stroke:#2ecc71,stroke-width:2px
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 ```
+
+Create `backend/.env`:
+
+```env
+GOOGLE_API_KEY=your_google_api_key
+TAVILY_API_KEY=your_tavily_api_key
+THESYS_API_KEY=your_thesys_api_key
+MONGO_CONNECTION_STRING=your_mongodb_connection_string
+```
+
+Run the backend:
+
+```bash
+python manage.py runserver
+```
+
+Backend runs at:
+
+```text
+http://127.0.0.1:8000
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+npm install
+```
+
+Create `frontend/.env`:
+
+```env
+VITE_API_URL=http://127.0.0.1:8000/api/
+```
+
+Run the frontend:
+
+```bash
+npm run dev
+```
+
+Frontend runs at:
+
+```text
+http://localhost:5173
+```
+
+---
+
+## ☁️ Deployment Guide
+
+Recommended deployment split:
+
+| Service | Platform |
+| --- | --- |
+| Backend | Render |
+| Frontend | Vercel |
+| Database | MongoDB Atlas |
+
+### Render Backend
+
+Set these environment variables in Render:
+
+```env
+GOOGLE_API_KEY=...
+TAVILY_API_KEY=...
+THESYS_API_KEY=...
+MONGO_CONNECTION_STRING=...
+```
+
+Recommended start command:
+
+```bash
+python manage.py runserver 0.0.0.0:$PORT
+```
+
+For a stronger production setup, use an ASGI server such as Uvicorn:
+
+```bash
+uvicorn core.asgi:application --host 0.0.0.0 --port $PORT
+```
+
+### Vercel Frontend
+
+Set this environment variable in Vercel:
+
+```env
+VITE_API_URL=https://your-render-service.onrender.com/api/
+```
+
+Build command:
+
+```bash
+npm run build
+```
+
+Output directory:
+
+```text
+dist
+```
+
+### MongoDB Atlas
+
+Use Atlas for hosted MongoDB:
+
+1. Create a cluster.
+2. Create a database user.
+3. Allow Render to connect through Network Access.
+4. Add the Atlas connection string to Render as `MONGO_CONNECTION_STRING`.
+
+For demos, `0.0.0.0/0` is convenient but broad. For production, restrict access more carefully.
+
+---
+
+## 🔐 Environment Variables
+
+### Backend
+
+| Name | Required | Purpose |
+| --- | --- | --- |
+| `GOOGLE_API_KEY` | Yes | Gemini model access |
+| `TAVILY_API_KEY` | Yes | Web and image search |
+| `THESYS_API_KEY` | Yes | C1 UI generation |
+| `MONGO_CONNECTION_STRING` | Yes | MongoDB session storage |
+
+### Frontend
+
+| Name | Required | Purpose |
+| --- | --- | --- |
+| `VITE_API_URL` | Yes | Backend API base URL |
+
+Keep all provider keys on the backend. Never expose Gemini, Tavily, Thesys, or MongoDB secrets in Vercel frontend variables.
+
+---
+
+## 🧪 Known Improvements
+
+This project is already demo-ready, but these upgrades would make it stronger for production and interviews:
+
+- Add backend rate limiting to protect API quotas.
+- Add graceful quota and provider-error responses.
+- Replace development Django server with a production ASGI setup.
+- Add health-check endpoint for Render.
+- Add MongoDB indexes on `session_id`, `turn_number`, and `created_at`.
+- Add automatic cleanup for old demo sessions.
+- Fix frontend ESLint script/config mismatch.
+- Remove stale helper code from earlier Crawl4AI-based retrieval experiments or reconnect it intentionally.
+- Move sensitive settings such as `SECRET_KEY`, `DEBUG`, and `ALLOWED_HOSTS` to environment variables.
+- Add tests for routing, SSE formatting, and session APIs.
+
+---
+
+## 🌟 Why This Project Stands Out
+
+ARGON demonstrates several concepts recruiters care about:
+
+- full-stack deployment readiness,
+- async backend design,
+- real-time streaming UX,
+- LLM orchestration,
+- search-augmented generation,
+- source attribution,
+- persistent conversation state,
+- thoughtful frontend state management,
+- practical handling of third-party AI APIs.
+
+It is not just a UI wrapper around an LLM. It is a small AI product architecture with routing, retrieval, streaming, memory, and interactive presentation working together.

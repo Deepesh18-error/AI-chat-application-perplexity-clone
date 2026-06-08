@@ -1,5 +1,8 @@
 .env
 .env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 
 # BACKEND (Python / Django)
 
@@ -16,7 +19,6 @@ db.sqlite3
 
 node_modules/
 
-# Vite build output folder (will be created later)
 dist/
 
 

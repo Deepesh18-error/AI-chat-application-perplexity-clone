@@ -23,35 +23,359 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center, rgba(25, 25, 25, 0.92) 0, #101010 46%, #070707 100%);
+  color: var(--text-color);
+  padding: 24px;
+  isolation: isolate;
+}
+
+.auth-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black 0 46%, transparent 78%);
+  opacity: 0.45;
+  z-index: -3;
+}
+
+.auth-screen::after {
+  content: '';
+  position: absolute;
+  width: 380px;
+  height: 120px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.07), transparent 68%);
+  filter: blur(24px);
+  z-index: -2;
+}
+
+.auth-circuit {
+  position: absolute;
+  width: min(46vw, 620px);
+  height: 260px;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.auth-circuit::before,
+.auth-circuit::after {
+  display: none;
+}
+
+.auth-circuit-left-top {
+  left: clamp(20px, 6vw, 80px);
+  top: clamp(70px, 14vh, 145px);
+}
+
+.auth-circuit-right-top {
+  right: clamp(20px, 6vw, 80px);
+  top: clamp(70px, 14vh, 145px);
+}
+
+.auth-circuit-left-bottom {
+  left: clamp(20px, 6vw, 80px);
+  bottom: clamp(70px, 14vh, 145px);
+}
+
+.auth-circuit-right-bottom {
+  right: clamp(20px, 6vw, 80px);
+  bottom: clamp(70px, 14vh, 145px);
+}
+
+.auth-circuit-path {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.auth-circuit-path path {
+  fill: none;
+  stroke: #242424;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.auth-node-card {
+  position: absolute;
+  width: 86px;
+  height: 36px;
+  top: 18px;
+  border: 1px solid #383838;
+  border-radius: 7px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.34) 1px, transparent 1px) 12px 10px / 8px 8px,
+    linear-gradient(180deg, #242424, #141414);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.auth-circuit-left-top .auth-node-card,
+.auth-circuit-left-bottom .auth-node-card {
+  left: -8px;
+}
+
+.auth-circuit-right-top .auth-node-card,
+.auth-circuit-right-bottom .auth-node-card {
+  right: -8px;
+}
+
+.auth-circuit-left-bottom .auth-node-card,
+.auth-circuit-right-bottom .auth-node-card {
+  top: auto;
+  bottom: 18px;
+}
+
+.auth-node-light {
+  fill: #e9eef7;
+  filter: drop-shadow(0 0 4px rgba(171, 210, 255, 0.65)) drop-shadow(0 0 8px rgba(171, 210, 255, 0.24));
+}
+
+.auth-panel {
+  width: min(390px, calc(100vw - 34px));
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(29, 29, 29, 0.96), rgba(20, 20, 20, 0.96));
+  border: 1px solid #303030;
+  border-radius: 11px;
+  padding: 23px 21px 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72), inset 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.auth-panel > h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: 0;
+  color: #f4f4f4;
+}
+
+.auth-panel > p {
+  margin: 0;
+  text-align: center;
+  color: #8f8f8f;
+  font-size: 13px;
+}
+
+.auth-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 19px;
+  margin: 0 0 4px;
+}
+
+.auth-dot-grid {
+  width: 48px;
+  height: 15px;
+  opacity: 0.55;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.48) 1px, transparent 1.5px);
+  background-size: 7px 7px;
+}
+
+.auth-logo {
+  min-width: 84px;
+  display: grid;
+  place-items: center;
+  color: #f3f6ff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 5px;
+  text-indent: 5px;
+  text-shadow: 0 0 14px rgba(171, 210, 255, 0.22);
+}
+
+.auth-copy {
+  text-align: center;
+  margin-bottom: 7px;
+}
+
+.auth-copy h1,
+.auth-copy p,
+.auth-error {
+  margin: 0;
+}
+
+.auth-copy h1 {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #f4f4f4;
+}
+
+.auth-copy p {
+  margin-top: 10px;
+  color: #8f8f8f;
+  font-size: 12px;
+}
+
+.auth-copy button {
+  appearance: none;
+  margin-left: 5px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-field {
+  height: 40px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0d0d0d;
+  border: 1px solid #242424;
+  border-radius: 7px;
+  padding: 0 13px;
+  color: #888;
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.9);
+}
+
+.auth-field:focus-within {
+  border-color: #3f5c83;
+  box-shadow: 0 0 0 2px rgba(25, 133, 231, 0.18), inset 0 1px 5px rgba(0, 0, 0, 0.9);
+}
+
+.auth-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-color);
+  font: inherit;
+  font-size: 13px;
+}
+
+.auth-field input::placeholder {
+  color: #8b8b8b;
+}
+
+.auth-primary {
+  height: 41px;
+  border: 1px solid #248df2;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #2294f6, #0d78dc);
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(0, 136, 255, 0.22), inset 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.auth-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.auth-error {
+  color: #ff7777;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 820px) {
+  .auth-circuit {
+    opacity: 0.35;
+    transform: scale(0.72);
+  }
+}
+
+@media (max-width: 620px) {
+  .auth-screen {
+    padding: 18px;
+  }
+
+  .auth-screen::before {
+    opacity: 0.26;
+  }
+
+  .auth-circuit {
+    display: none;
+  }
+
+  .auth-panel {
+    padding: 22px 18px 19px;
+  }
+}
+
+.auth-user-bar {
+  position: fixed;
+  top: 14px;
+  right: 18px;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.auth-user-bar button {
+  border: 1px solid #444;
+  border-radius: 8px;
+  background: #2e2e2e;
+  color: var(--text-color);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
 html, body {
-  overflow-x: hidden; /* The key to hiding the horizontal scrollbar */
+  overflow-x: hidden;
 }
 
 
 body {
 
   scrollbar-width: thin;
-  scrollbar-color: #4a4a4a transparent; /* Thumb color, then Track color */
+  scrollbar-color: #4a4a4a transparent;
 }
 
 
-/* This targets the main scrollbar for the entire body */
+
 body::-webkit-scrollbar {
-  width: 8px; /* A nice, slim width */
+  width: 8px;
 }
 
 body::-webkit-scrollbar-track {
-  background: transparent; /* Make the track invisible, as requested */
+  background: transparent;
 }
 
 body::-webkit-scrollbar-thumb {
-  background-color: #4a4a4a;    /* The dark grey, pill-shaped thumb */
+  background-color: #4a4a4a;
   border-radius: 10px;
-  border: 2px solid var(--background-color); /* Creates the "floating" effect */
+  border: 2px solid var(--background-color);
 }
 
 body::-webkit-scrollbar-thumb:hover {
-  background-color: #6b6b6b; /* Slightly lighter on hover */
+  background-color: #6b6b6b;
 }
 
 .chat-area {
@@ -59,45 +383,45 @@ body::-webkit-scrollbar-thumb:hover {
   overflow-y: auto;
   padding: 20px;
   box-sizing: border-box;
-  scrollbar-width: thin;                     /* Makes the scrollbar narrow in Firefox */
-  scrollbar-color: #4a4a4a transparent;     /* Sets thumb and track color in Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a transparent;
   display: flex;
   flex-direction: column;
 }
 
 
 .chat-area::-webkit-scrollbar {
-  width: 8px; /* Sets the width of the scrollbar */
+  width: 8px;
 }
 
 .chat-area::-webkit-scrollbar-track {
-  background: transparent; /* Makes the track invisible, matching your theme */
+  background: transparent;
 }
 
 
 .chat-area::-webkit-scrollbar-thumb {
-  background-color: #4a4a4a;    /* A dark grey that matches your UI */
-  border-radius: 10px;          /* Gives it fully rounded corners */
-  border: 2px solid var(--background-color); /* Creates a "padding" effect around the thumb */
+  background-color: #4a4a4a;
+  border-radius: 10px;
+  border: 2px solid var(--background-color);
 }
 
 .chat-area::-webkit-scrollbar-thumb:hover {
-  background-color: #6b6b6b; /* A slightly lighter grey on hover */
+  background-color: #6b6b6b;
 }
 
 
-/* Welcome Screen */
+
 .welcome-screen { text-align: center; margin: auto; }
 .welcome-screen h1 { font-size: 2.8em; color: var(--primary-color); font-weight: 700; }
 .example-prompts { margin-top: 30px; display: flex; flex-direction: column; gap: 15px; align-items: center; }
 .example-prompts button { background-color: var(--input-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 12px 20px; border-radius: 8px; cursor: pointer; font-size: 15px; width: 80%; max-width: 450px; text-align: left; transition: background-color 0.2s; }
 .example-prompts button:hover { background-color: #333; }
 
-/* Response Container */
+
 .response-container { border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--container-bg); padding: 20px; margin-bottom: 25px; }
 .response-prompt { font-size: 1.1em; margin-bottom: 20px; font-weight: 500; }
 
-/* Tabs */
+
 .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
 .tabs button {
   display: flex;
@@ -117,29 +441,29 @@ body::-webkit-scrollbar-thumb:hover {
 
 .tabs button.active { color: var(--primary-color); border-bottom: 2px solid var(--primary-color); }
 
-/* Tab Content */
+
 .tab-content { transition: opacity 0.3s; }
 .response-completion { line-height: 1.7; font-size: 16px; }
 .blinking-cursor { animation: blink 1s step-end infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* Source Cards */
-.sources-grid { 
-  display: grid; 
-  grid-template-columns: 
-  repeat(auto-fill, minmax(250px, 1fr)); 
-  gap: 15px; 
+
+.sources-grid {
+  display: grid;
+  grid-template-columns:
+  repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
 }
 
-.source-card { 
-  display: flex; 
-  align-items: center; 
-  gap: 12px; 
-  background-color: var(--input-bg); 
-  padding: 12px; border-radius: 8px; 
-  text-decoration: none; 
-  border: 1px solid transparent; 
-  transition: border-color 0.2s; 
+.source-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: var(--input-bg);
+  padding: 12px; border-radius: 8px;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
 }
 
 .source-card:hover { border-color: var(--primary-color); }
@@ -148,7 +472,7 @@ body::-webkit-scrollbar-thumb:hover {
   height: 24px;
 }
 
-/* Source Info */
+
 .source-info {
   display: flex;
   flex-direction: column;
@@ -168,7 +492,7 @@ body::-webkit-scrollbar-thumb:hover {
   font-size: 12px;
 }
 
-/* Steps Timeline */
+
 .steps-timeline .step-item {
   position: relative;
   padding-left: 25px;
@@ -221,24 +545,35 @@ body::-webkit-scrollbar-thumb:hover {
   }
 }
 
-/* Error Message */
+
 .error-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   margin-top: 15px;
-  color: #ff8b8b;
-  background-color: rgba(255, 107, 107, 0.1);
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ff8b8b;
+  color: #ffb4b4;
+  background: rgba(248, 113, 113, 0.08);
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  line-height: 1.45;
+}
+
+.error-message svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 
 .image-grid-container {
-  position: relative; 
+  position: relative;
   padding-top: 16px;
   height: clamp(400px, 60vh, 700px);
 }
 
-/*  The Grid Layout  */
+
 .image-grid {
   display: grid;
   gap: 12px;
@@ -246,7 +581,7 @@ body::-webkit-scrollbar-thumb:hover {
   height: 100%;
 }
 
-/* (Layouts for 3, 4, 5+ images are the same as before) */
+
 .image-grid.image-count-5 {
   grid-template-columns: repeat(6, 1fr);
   grid-template-rows: repeat(2, 1fr);
@@ -259,7 +594,7 @@ body::-webkit-scrollbar-thumb:hover {
 .image-grid.image-count-4 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
 
 
-/*  The Image Card & Its States  */
+
 .image-card {
   border-radius: 12px;
   overflow: hidden;
@@ -273,30 +608,30 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 
-/* 1. When an image is selected, the overlay appears to catch clicks */
+
 .close-overlay {
   position: absolute;
   inset: 0;
-  z-index: 5; 
+  z-index: 5;
 }
 
-/* 2. When an image is selected, fade and blur the grid items that are NOT selected */
+
 .image-grid-container.has-selection .image-card:not(.is-selected) {
   opacity: 0.5;
   filter: blur(4px);
-  transform: scale(0.98); /* Slight shrink effect */
+  transform: scale(0.98);
 }
 
-/* 3. The SELECTED image is brought to the front, centered, and enlarged */
+
 .image-card.is-selected {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 70%;  /* Make it large */
+  width: 70%;
   height: 70%;
-  transform: translate(-50%, -50%) scale(1.05); /* Center it and scale up slightly */
-  z-index: 10; /* Bring it to the very front */
-  outline: 4px solid rgba(255, 255, 255, 0.7); /* Optional: add a highlight border */
+  transform: translate(-50%, -50%) scale(1.05);
+  z-index: 10;
+  outline: 4px solid rgba(255, 255, 255, 0.7);
   outline-offset: -4px;
   box-shadow: 0 10px 40px rgba(0,0,0,0.5);
 }
@@ -313,61 +648,61 @@ body::-webkit-scrollbar-thumb:hover {
 
 .main-content {
   flex-grow: 1;
-  display: flex; /* It remains a flex container */
-  flex-direction: column; /* To stack chat on top of prompt */
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  
+
   max-width: 820px;
   margin: 0 auto;
   width: 100%;
 }
 
 .chat-area {
-  flex-grow: 1; 
-  overflow-y: visible; 
-  
+  flex-grow: 1;
+  overflow-y: visible;
+
   padding: 20px;
   box-sizing: border-box;
 }
 
-/* This is the new wrapper for the prompt form at the bottom */
+
 .prompt-section {
   padding: 20px;
   padding-top: 15px;
   border-top: 1px solid var(--border-color);
   background-color: var(--background-color);
-  
+
 
   flex-shrink: 0;
 }
 
-/*  COLLAPSIBLE SIDEBAR STYLES  */
 
-/* Style for when the sidebar is OPEN (its default state) */
+
+
 .sidebar.open {
   width: 280px;
   transform: translateX(0);
   border-right: 1px solid var(--border-color);
 }
 
-/* Style for when the sidebar is CLOSED */
+
 .sidebar.closed {
   width: 0;
   transform: translateX(-100%);
-  border-right: none; /* Hide border when closed */
+  border-right: none;
 }
 
-/*  SIDEBAR TOGGLE BUTTON  */
 
 
 
-/*  SIDEBAR TOGGLE BUTTON   */
+
+
 .sidebar-toggle-btn {
   position: absolute;
   top: 15px;
-  
-  /* Start position when sidebar is closed */
-  left: 15px; 
+
+
+  left: 15px;
 
   z-index: 1000;
   background: transparent;
@@ -377,8 +712,8 @@ body::-webkit-scrollbar-thumb:hover {
   color: var(--text-muted);
   font-size: 24px;
   line-height: 1;
-  
-  /* Animate BOTH color and left position */
+
+
   transition: color 0.2s, left 0.3s ease-in-out;
 }
 
@@ -387,29 +722,29 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .main-content.sidebar-is-open .sidebar-toggle-btn {
-  /* Move the button to the right by the width of the sidebar + padding */
+
   left: calc(280px + 15px);
 }
 
-/*  ENHANCED STEPS TIMELINE STYLES  */
 
-/* Base styles for all step items for consistent spacing */
+
+
 .steps-timeline .step-item {
   position: relative;
-  padding-left: 30px; /* Increased padding for alignment */
+  padding-left: 30px;
   margin-bottom: 15px;
-  display: flex; /* Use flex for alignment */
-  align-items: center; /* Center icon and text vertically */
-  min-height: 24px; /* Ensure consistent height */
+  display: flex;
+  align-items: center;
+  min-height: 24px;
 }
 
-/* Modify the ::before pseudo-element for better alignment */
+
 .steps-timeline .step-item::before {
   content: '✓';
   position: absolute;
   left: 0;
-  top: 50%; /* Center vertically */
-  transform: translateY(-50%); /* Precise vertical centering */
+  top: 50%;
+  transform: translateY(-50%);
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -419,17 +754,17 @@ body::-webkit-scrollbar-thumb:hover {
   font-weight: bold;
 }
 
-/* Style for the special search query steps */
+
 .steps-timeline .search-query {
-  background-color: rgba(255, 255, 255, 0.03); /* Subtle background highlight */
+  background-color: rgba(255, 255, 255, 0.03);
   border-radius: 6px;
   padding: 8px 12px;
   border-left: 3px solid var(--primary-color);
-  margin-left: 10px; /* Indent the search queries */
-  padding-left: 12px; /* Override the base padding-left */
+  margin-left: 10px;
+  padding-left: 12px;
 }
 
-/* Search queries don't need the checkmark/dot from the base .step-item */
+
 .steps-timeline .search-query::before {
   display: none;
 }
@@ -446,17 +781,17 @@ body::-webkit-scrollbar-thumb:hover {
   font-size: 14px;
 }
 
-/*  CHAT HISTORY LIST STYLES  */
+
 
 .chat-history-list {
   margin-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  overflow-y: auto; /* Allow history to scroll if it's long */
-  flex-grow: 1; /* Take up remaining space in sidebar */
-  margin-right: -15px;  /* 1. Pull the container to the right edge, filling the parent's padding */
-  padding-right: 15px; /* 2. Push the content back in so text doesn't touch the new scrollbar */
+  overflow-y: auto;
+  flex-grow: 1;
+  margin-right: -15px;
+  padding-right: 15px;
 
   scrollbar-width: thin;
 }
@@ -466,7 +801,7 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .chat-history-list::-webkit-scrollbar-track {
-  background: transparent; /* Track is invisible */
+  background: transparent;
 }
 
 .chat-history-list::-webkit-scrollbar-thumb {
@@ -496,75 +831,75 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .history-notice-banner {
-  background-color: rgba(59, 130, 246, 0.1); /* Subtle blue background */
-  color: #a5b4fc; /* Light blue/purple text */
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #a5b4fc;
   border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 8px;
   padding: 10px 15px;
-  margin-bottom: 20px; /* Space before the tabs */
+  margin-bottom: 20px;
   font-size: 14px;
   line-height: 1.5;
 }
 
-/*  SIDEBAR ERROR TEXT  */
+
 .sidebar-error-text {
   font-size: 14px;
-  color: #ff8b8b; /* A noticeable but not jarring red */
+  color: #ff8b8b;
   padding: 10px;
   text-align: center;
   background-color: rgba(255, 107, 107, 0.1);
   border-radius: 6px;
 }
 
-/*  DELETE BUTTON STYLES  */
+
 
 .chat-history-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  box-sizing: border-box; 
-  width: 100%; /* Ensure it takes the full width of the sidebar */
+  box-sizing: border-box;
+  width: 100%;
 }
 
-/* This ensures the title truncates properly and doesn't push the button */
+
 .history-item-title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-grow: 1; /* Allow it to grow */
-  min-width: 0; /* A flexbox trick to allow shrinking and ellipsis */
+  flex-grow: 1;
+  min-width: 0;
 }
 
-/* Updated styles for the icon button */
+
 .delete-button {
   background: transparent;
   border: none;
   color: grey;
   cursor: pointer;
-  padding: 8px; /* A little padding to make it easier to click */
+  padding: 8px;
   border-radius: 6px;
-  flex-shrink: 0; 
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  
-  /* The magic: Hide it by default and set up a transition */
+
+
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s ease-in-out;
 }
 
-/* The hover effect: When hovering the PARENT, make the button visible */
+
 .chat-history-item:hover .delete-button {
   opacity: 1;
   visibility: visible;
 }
 
-/* A nice hover effect for the button itself */
+
 .delete-button:hover {
-  background-color: rgba(255, 107, 107, 0.15); /* Subtle red background */
-  color: #e26868; /* Red icon color */
+  background-color: rgba(255, 107, 107, 0.15);
+  color: #e26868;
 }
 
 
@@ -595,7 +930,7 @@ body::-webkit-scrollbar-thumb:hover {
     padding: 0;
     margin-bottom: 8px;
     scrollbar-width: thin;
-    scrollbar-color: #4a4a4a var(--container-bg); /* Thumb color, Track color */
+    scrollbar-color: #4a4a4a var(--container-bg);
 }
 
 .prompt-textarea::-webkit-scrollbar {
@@ -603,18 +938,18 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .prompt-textarea::-webkit-scrollbar-track {
-  background: transparent; /* Track is invisible */
+  background: transparent;
 }
 
 .prompt-textarea::-webkit-scrollbar-thumb {
-  background-color: #4a4a4a;    /* Dark grey thumb */
+  background-color: #4a4a4a;
   border-radius: 10px;
-  /* The border should match the prompt bar's background for the inset look */
-  border: 2px solid var(--container-bg); 
+
+  border: 2px solid var(--container-bg);
 }
 
 .prompt-textarea::-webkit-scrollbar-thumb:hover {
-  background-color: #6b6b6b; /* Lighter grey on hover */
+  background-color: #6b6b6b;
 }
 
 
@@ -637,13 +972,13 @@ body::-webkit-scrollbar-thumb:hover {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/*  The GLOW effect on focus  */
+
 .prompt-form:focus-within {
     border-color: #4a4a4a;
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
-/*  2. The Textarea  */
+
 .prompt-textarea {
     flex-grow: 1;
     background: transparent;
@@ -659,7 +994,7 @@ body::-webkit-scrollbar-thumb:hover {
     outline: none;
 }
 
-/*  3. The Button Actions Bar  */
+
 .prompt-actions-bar {
     display: flex;
     justify-content: space-between;
@@ -673,7 +1008,7 @@ body::-webkit-scrollbar-thumb:hover {
     gap: 8px;
 }
 
-/*  4. The Action Icons (Globe & Mic) - CORRECTED  */
+
 .action-btn {
     background-color: #2e2e2e;
     color: grey;
@@ -688,26 +1023,26 @@ body::-webkit-scrollbar-thumb:hover {
     width: 36px;
     height: 36px;
 }
-/* THIS IS THE CORRECT HOVER EFFECT: Subtle background and white icon, no fill */
+
 .action-btn:hover {
     background-color: #3f3f3f;
     color: whitesmoke;
     border-color: white;
 }
-/* Style for when mic is active (recording) */
+
 .action-btn.active {
     background-color: #3b82f6;
     color: white;
     border-color: #3b82f6;
 }
-/* Style for when web search is toggled ON */
+
 .web-search-toggle.active {
     background-color: skyblue;
     color: white;
     border-color: skyblue;
 }
 
-/*  5. The Submit "Ask" Button - CORRECTED  */
+
 .submit-btn {
     background-color: #3a3a3a;
     color: #b0b0b0;
@@ -720,47 +1055,85 @@ body::-webkit-scrollbar-thumb:hover {
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 .submit-btn:hover {
-    /* Hover state when ENABLED */
+
     background-color: #4a4a4a;
     color: white;
 }
 .submit-btn:disabled {
-    /* Disabled state (no text in box) - This is why it was hard to see before */
+
     background-color: #2a2a2a;
     color: #555;
     cursor: not-allowed;
 }
 
 .turn-container {
-    margin-bottom: 40px; /* Vertical space between conversation turns */
+    margin-bottom: 40px;
 }
 
-/*  2. User Prompt Bubble  */
+
 
 .user-prompt {
-    background-color: #1c1c1c; /* A slightly lighter shade than the main background */
+    background-color: #1c1c1c;
     padding: 16px 20px;
     border-radius: 12px;
-    margin-bottom: 20px; /* Space between the user prompt and the AI answer */
+    margin-bottom: 20px;
     color: #e0e0e0;
     font-size: 1.1rem;
 }
 
-/*  3. AI Response Container - THE CORE FIX  */
-/* This implements the "invisible container" and "liberates" the content */
+
+
 .ai-response-container {
-    /* Make the container itself invisible */
+
     background: transparent;
     border: none;
     padding: 0;
     box-shadow: none;
-    overflow: visible; /* Prevents this element from having its own scrollbar */
-    max-height: none;  /* Allows the content to be as tall as it needs */
+    overflow: visible;
+    max-height: none;
+}
+
+.response-notice-stack {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.response-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.045);
+    color: #d6d6d6;
+}
+
+.response-notice svg {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.response-notice.warning {
+    border-color: rgba(251, 191, 36, 0.22);
+    background: rgba(251, 191, 36, 0.08);
+    color: #f3d99a;
+}
+
+.response-notice.error {
+    border-color: rgba(248, 113, 113, 0.28);
+    background: rgba(248, 113, 113, 0.08);
+    color: #ffb4b4;
 }
 
 .tab-content {
     padding-top: 20px;
-    overflow: visible; /* Also prevent this from scrolling */
+    overflow: visible;
     max-height: none;
 }
 
@@ -769,12 +1142,12 @@ body::-webkit-scrollbar-thumb:hover {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  background-color: var(--background-color); 
+  background-color: var(--background-color);
 }
 
 .ai-response-container.focused-view .tab-content {
-  flex-grow: 1; /* Allow the content area to expand */
-  overflow-y: auto; 
+  flex-grow: 1;
+  overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #4a4a4a transparent;
 }
@@ -798,26 +1171,25 @@ body::-webkit-scrollbar-thumb:hover {
   width: 18px;
   height: 18px;
 
-  /* We keep this to make bold outline icons appear thinner and more consistent */
+
   stroke-width: 0.5;
 
-  /* A good practice to prevent the icon from being squished */
+
   flex-shrink: 0;
 }
 
-/*
-   PROCESSING TIMELINE STYLES (index.css)*/
+
 
 .processing-timeline {
   position: relative;
-  padding-left: 30px; /* Space for the icons and line */
+  padding-left: 30px;
 }
 
-/* The main vertical line */
+
 .processing-timeline::before {
   content: '';
   position: absolute;
-  left: 11px; /* Aligns with the center of the icons */
+  left: 11px;
   top: 10px;
   bottom: 10px;
   width: 2px;
@@ -835,16 +1207,16 @@ body::-webkit-scrollbar-thumb:hover {
 .timeline-icon {
   font-size: 22px;
   line-height: 1;
-  background-color: var(--background-color); /* To punch a hole in the line */
+  background-color: var(--background-color);
   padding: 2px 0;
 }
 
-/* Icon Status Colors */
-.icon-complete { color: #2ecc71; } /* Green */
-.icon-active { color: #f1c40f; } /* Yellow/Gold */
+
+.icon-complete { color: #2ecc71; }
+.icon-active { color: #f1c40f; }
 .icon-pending { color: #555; }
 
-/* Spinner Animation */
+
 .spinner {
   animation: spin 1.2s linear infinite;
 }
@@ -855,7 +1227,7 @@ body::-webkit-scrollbar-thumb:hover {
 
 .timeline-title {
   margin: 0;
-  padding-top: 2px; /* Align text with icons */
+  padding-top: 2px;
   font-weight: 500;
   color: var(--text-muted);
 }
@@ -866,7 +1238,7 @@ body::-webkit-scrollbar-thumb:hover {
   color: var(--primary-color);
 }
 
-/* Sub-items (like queries and domains) */
+
 .timeline-children {
   margin-top: 10px;
 }
@@ -887,20 +1259,18 @@ body::-webkit-scrollbar-thumb:hover {
   margin: 8px 0 0 0;
 }
 
-/*
-   TIMELINE UI ENHANCEMENTS (index.css)
-   */
 
-/*  The new bordered box style  */
+
+
 .sub-item-box {
   margin-top: 12px;
-  border: 1px solid #444; /* A slightly lighter grey border */
+  border: 1px solid #444;
   border-radius: 8px;
   padding: 12px 15px;
-  background-color: rgba(255, 255, 255, 0.02); /* A very subtle background tint */
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
-/*  Style for the "and X more..." button  */
+
 .expand-button {
   background: none;
   border: none;
@@ -919,46 +1289,70 @@ body::-webkit-scrollbar-thumb:hover {
   text-decoration: underline;
 }
 
-/* 
-   FINAL SIDEBAR THEME (index.css)
-    */
 
-/*  1. Main Sidebar Container  */
+
+
 .sidebar {
-  background-color: #1a1a1a;
-  border-right: 1px solid var(--border-color);
+  position: relative;
+  z-index: 1300;
+  width: 300px;
+  height: 100vh;
+  background: linear-gradient(180deg, #1b1b1b 0%, #161616 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
-  transition: transform 0.3s ease-in-out, width 0.2s ease-in-out;
+  transition: transform 0.28s ease, width 0.28s ease, box-shadow 0.28s ease;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   overflow-y: hidden;
+  box-shadow: 24px 0 60px rgba(0, 0, 0, 0.28);
+  will-change: transform, width;
 }
+
+.sidebar.open {
+  width: 300px;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.sidebar.closed {
+  width: 0;
+  transform: translateX(-100%);
+  border-right: none;
+  box-shadow: none;
+  pointer-events: none;
+}
+
 .sidebar-content {
-  padding: 15px;
+  width: 300px;
+  box-sizing: border-box;
+  padding: 16px 14px 14px;
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
-/*  2. Sidebar Header & Toggle Button  */
+
 .sidebar-header {
   display: flex;
-  justify-content: space-between; /* Aligns title and toggle button */
+  justify-content: center;
   align-items: center;
-  padding-bottom: 15px;
+  position: relative;
+  padding: 2px 46px 17px;
   margin-bottom: 15px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-header h1 {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: 1.7rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.4px;
   color: #f0f0f0;
-  flex-grow: 1; /* Allow the title to take up available space */
   text-align: center;
-  margin-left: -20px; 
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.08);
 }
 
 
@@ -966,107 +1360,217 @@ body::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  background-color: #2e2e2e;
-  border: 1px solid #0b0b0b; /* A much more subtle border */
-  border-radius: 8px; /* Standard rounded corners */
-  font-family: 'Inter', sans-serif; /* Revert to the default font */
-  font-size: 1rem; /* Standard font size */
-  font-weight: 500;
+  gap: 10px;
+  background: linear-gradient(180deg, #303030, #292929);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
   text-transform: none;
-  white-space: nowrap; /* CRITICAL: Prevents text from ever wrapping */
-  
-  color: rgb(237, 128, 88);
+  white-space: nowrap;
+  color: #ff8f68;
   width: 100%;
-  height: 48px; /* A standard, professional height */
-  padding: 0 15px; /* Standard padding */
+  height: 46px;
+  padding: 0 14px;
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .new-chat-btn:hover {
-  background-color: #3f3f3f;
-  border-color: #777;
+  background: linear-gradient(180deg, #373737, #2c2c2c);
+  border-color: rgba(255, 143, 104, 0.45);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
 }
 
 .new-chat-btn svg {
-  width: 1rem;   /* e.g., 16px */
-  height: 1rem;  /* e.g., 16px */
-  stroke-width: 3; 
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 3;
   flex-shrink: 0;
 }
 
-/*  4. Section Title ('Chats')  */
-.history-title {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: 500;
-  padding: 20px 10px 10px 10px; /* Add more space above */
-  text-transform: uppercase;
-  letter-spacing: 0.75px;
+.history-section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 22px 8px 10px;
 }
 
-/*  5. Chat History Items  */
+.history-eyebrow {
+  display: block;
+  color: #777;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.history-title {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #b7bec8;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.history-count {
+  min-width: 26px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: #a7a7a7;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.chat-history-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 4px 18px 0;
+  margin-right: -5px;
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a transparent;
+}
+
+.chat-history-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-history-list::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a;
+  border-radius: 10px;
+  border: 2px solid #191919;
+}
+
+.chat-history-list::-webkit-scrollbar-thumb:hover {
+  background-color: #6b6b6b;
+}
+
+.history-loading-state {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.history-loading-state span {
+  height: 54px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+  background-size: 220% 100%;
+  animation: historySkeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes historySkeleton {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+
 .chat-history-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 6px;
+  min-height: 54px;
+  padding: 9px 8px 9px 10px;
+  border-radius: 10px;
+  background: transparent;
   color: var(--text-color);
-  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
   cursor: pointer;
   text-align: left;
-  transition: background-color 0.2s, border-color 0.2s;
+  transition: background-color 0.18s, border-color 0.18s, transform 0.18s;
   border: 1px solid transparent;
+  box-sizing: border-box;
 }
+
 .chat-history-item:hover {
-  background-color:   rgb(50, 47, 47);
+  background-color: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.08);
+  transform: translateX(2px);
 }
+
 .chat-history-item.active {
-  background-color: #2e2e2e;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.06));
   color: white;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+}
+
+.history-item-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: #aab1bc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.chat-history-item.active .history-item-icon {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.history-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-item-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  line-height: 1.25;
+}
+
+.history-item-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #777;
+  font-size: 11px;
   font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
-/*  6. The New Sidebar Toggle Icon Button  */
+
 .sidebar-toggle-btn {
-  position: absolute;
-  top: 15px;
-  left: 15px; 
-  z-index: 1000;
-  background-color: #2e2e2e;
-  border: 1px solid #444;
-  border-radius: 8px;
-  padding: 8px;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-size: 20px; /* Control the icon size */
-  line-height: 1;
-  display: flex; /* To center the icon */
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease-in-out;
-}
-.sidebar-toggle-btn:hover {
-  color: var(--text-color);
-  background-color: #3f3f3f;
-  border-color: #666;
-}
-.main-content.sidebar-is-open .sidebar-toggle-btn {
-  display: none; /* Hide the absolute positioned one */
-}
-
-.sidebar-toggle-btn-internal {
-  /* Re-use the styles but without absolute positioning */
-  background-color: #2e2e2e;
-  border: 1px solid #444;
-  border-radius: 8px;
-  padding: 8px;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1200;
+  width: 40px;
+  height: 40px;
+  background: rgba(46, 46, 46, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 0;
   cursor: pointer;
   color: var(--text-muted);
   font-size: 20px;
@@ -1074,16 +1578,109 @@ body::-webkit-scrollbar-thumb:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: transform 0.22s ease, background-color 0.22s, border-color 0.22s, color 0.22s;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
 }
+
+.sidebar-toggle-btn:hover {
+  color: var(--text-color);
+  background-color: #3f3f3f;
+  border-color: rgba(255, 255, 255, 0.26);
+  transform: translateY(-1px) scale(1.03);
+}
+
+.main-content.sidebar-is-open .sidebar-toggle-btn {
+  display: none;
+}
+
+.sidebar-toggle-btn-internal {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 38px;
+  height: 38px;
+  background-color: #2d2d2d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
 .sidebar-toggle-btn-internal:hover {
   color: var(--text-color);
   background-color: #3f3f3f;
-  border-color: #666;
+  border-color: rgba(255, 255, 255, 0.26);
+  transform: translateX(-1px);
+}
+
+.delete-button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #777;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.18s, visibility 0.18s, background-color 0.18s, color 0.18s;
+}
+
+.chat-history-item:hover .delete-button,
+.chat-history-item.active .delete-button {
+  opacity: 1;
+  visibility: visible;
+}
+
+.delete-button:hover {
+  background-color: rgba(255, 107, 107, 0.14);
+  color: #ff8b8b;
+}
+
+.no-history-state {
+  min-height: 180px;
+  margin: 4px 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  text-align: center;
+  color: #898989;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 22px;
+}
+
+.no-history-state svg {
+  color: #b0b0b0;
+  font-size: 24px;
+}
+
+.no-history-state p {
+  margin: 0;
+  color: #d2d2d2;
+  font-weight: 700;
+}
+
+.no-history-state span {
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 
-/* ── STREAMING MARKDOWN ── */
+
 .streaming-markdown {
   line-height: 1.7;
   font-size: 16px;
@@ -1158,7 +1755,7 @@ body::-webkit-scrollbar-thumb:hover {
   text-decoration: underline;
 }
 
-/* Blinking cursor at end of stream */
+
 .streaming-cursor {
   display: inline-block;
   width: 2px;
@@ -1175,7 +1772,7 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 
-/* ── MARKDOWN TABLE ── */
+
 .md-table-wrapper {
   overflow-x: auto;
   margin: 16px 0;
@@ -1217,7 +1814,7 @@ body::-webkit-scrollbar-thumb:hover {
   background-color: rgba(59, 130, 246, 0.05);
 }
 
-/* ── CITATIONS ── */
+
 .citation-group {
   display: inline-flex;
   gap: 2px;
@@ -1248,7 +1845,7 @@ body::-webkit-scrollbar-thumb:hover {
   background-color: rgba(59, 130, 246, 0.3);
 }
 
-/* ── OTHER MARKDOWN ELEMENTS ── */
+
 .md-blockquote {
   border-left: 3px solid var(--primary-color);
   margin: 12px 0;
@@ -1287,7 +1884,7 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 
-/* Citation wrapper — needs position:relative for tooltip */
+
 .citation-wrapper {
   position: relative;
   display: inline-block;
@@ -1323,18 +1920,18 @@ body::-webkit-scrollbar-thumb:hover {
   background-color: rgba(59, 130, 246, 0.35);
 }
 
-/* Tooltip card */
+
 .citation-tooltip {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  
+
   display: flex;
   flex-direction: column;
   gap: 4px;
-  
+
   background-color: #1e1e1e;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -1343,11 +1940,11 @@ body::-webkit-scrollbar-thumb:hover {
   max-width: 300px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 
-  /* Prevent tooltip from being cut off */
+
   pointer-events: auto;
 }
 
-/* Small arrow pointing down */
+
 .citation-tooltip::after {
   content: '';
   position: absolute;
@@ -1371,8 +1968,8 @@ body::-webkit-scrollbar-thumb:hover {
   font-weight: 500;
   color: var(--text-color);
   line-height: 1.4;
-  
-  /* Truncate long titles */
+
+
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
