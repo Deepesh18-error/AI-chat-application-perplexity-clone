@@ -88,6 +88,59 @@ def _format_context_for_prompt(context_package: Dict[str, Any]) -> str:
     return history_str
 
 
+def _clean_snippet(text: str, max_length: int = 420) -> str:
+    cleaned = re.sub(r"\s+", " ", text or "").strip()
+    if len(cleaned) <= max_length:
+        return cleaned
+    return cleaned[:max_length].rsplit(" ", 1)[0] + "..."
+
+
+def _build_snippet_fallback_answer(
+    prompt: str,
+    scraped_data: List[Dict[str, str]],
+    instant_answer: str | None = None,
+) -> str:
+    """Builds a readable cited answer when the LLM synthesis provider is slow."""
+    lines = []
+
+    if instant_answer:
+        lines.append(f"> **Quick Summary:** {instant_answer}")
+        lines.append("")
+
+    lines.append("## Source-backed fallback")
+    lines.append("")
+    lines.append(
+        "The synthesis model took too long, so ARGON is showing a compact answer from the retrieved sources instead."
+    )
+    lines.append("")
+
+    usable_items = [
+        item for item in scraped_data
+        if _clean_snippet(item.get("content", ""))
+    ][:4]
+
+    if not usable_items:
+        lines.append("The search completed, but the returned snippets did not contain enough readable text to summarize safely.")
+        return "\n".join(lines)
+
+    lines.append(f"**Query:** {prompt}")
+    lines.append("")
+    lines.append("### Key points")
+    for index, item in enumerate(usable_items, 1):
+        title = item.get("title") or item.get("source") or f"Source {index}"
+        snippet = _clean_snippet(item.get("content", ""))
+        lines.append(f"- **{title}**: {snippet} [{index}]")
+
+    lines.append("")
+    lines.append("### Sources")
+    for index, item in enumerate(usable_items, 1):
+        title = item.get("title") or f"Source {index}"
+        source = item.get("source") or ""
+        lines.append(f"{index}. [{title}]({source})" if source else f"{index}. {title}")
+
+    return "\n".join(lines)
+
+
 def extract_contextual_metadata(prompt: str) -> Dict[str, bool]:
     """
     Performs a rapid, computationally cheap analysis of the query's form
@@ -307,7 +360,7 @@ You MUST respond with ONLY a valid JSON object with four keys.
     
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-3-flash-preview", 
+            model_name=settings.GEMINI_CLASSIFIER_MODEL,
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(system_prompt)
@@ -413,6 +466,14 @@ def make_routing_decision(scores: Dict[str, float]) -> str:
     
     print(f"  > Calculated Decision Score: {decision_score:.4f}")
     print(f"  > Comparison Threshold: {DECISION_THRESHOLD}")
+
+    if (
+        scores["entity_dynamism_score"] <= 0.25
+        and scores["temporal_urgency_score"] <= 0.2
+        and scores["verification_need_score"] <= 0.5
+    ):
+        print("  > Stable concept detected. Using direct answer to avoid unnecessary provider fan-out.")
+        return "direct_answer"
 
     # Apply the threshold to make the final decision
     if decision_score > DECISION_THRESHOLD:
@@ -627,11 +688,11 @@ Don't just format the markdown - REIMAGINE it as an interface. Ask yourself: "If
             return raw_dsl_string
         else:
             logger.warning("Thesys failed to generate C1 response. status=%s", status_code)
-            return "<C1><P>Interactive UI generation is temporarily unavailable. The Markdown answer is still available.</P></C1>"
+            return ""
 
     except Exception as e:
         logger.warning("Thesys UI generation error: %s", e)
-        return "<C1><P>Interactive UI generation is temporarily unavailable. The Markdown answer is still available.</P></C1>"
+        return ""
 
 
 async def call_thesys_chat_api(prompt: str):
@@ -795,25 +856,26 @@ Professional but approachable. You're a knowledgeable colleague, not a formal re
     ]
 
     
-    model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+    model = genai.GenerativeModel(model_name=settings.GEMINI_MODEL)
 
    
-    response_stream = await with_timeout(
-        model.generate_content_async(full_prompt, stream=True),
-        settings.PROVIDER_TIMEOUT_SECONDS,
-        "Gemini synthesis",
-        "Answer synthesis is taking too long. Please try again.",
-    )
-    async for chunk in iter_with_timeout(
-        response_stream,
-        settings.GEMINI_STREAM_TIMEOUT_SECONDS,
-        "Gemini synthesis",
-        "Answer synthesis stopped responding. Please try again.",
-    ):
-        if chunk.text:
-            yield chunk.text
-
-    phase_end("synthesis")
+    try:
+        response_stream = await with_timeout(
+            model.generate_content_async(full_prompt, stream=True),
+            settings.PROVIDER_TIMEOUT_SECONDS,
+            "Gemini synthesis",
+            "Answer synthesis is taking too long. Showing the retrieved source summary instead.",
+        )
+        async for chunk in iter_with_timeout(
+            response_stream,
+            settings.GEMINI_STREAM_TIMEOUT_SECONDS,
+            "Gemini synthesis",
+            "Answer synthesis stopped responding. Showing the retrieved source summary instead.",
+        ):
+            if chunk.text:
+                yield chunk.text
+    finally:
+        phase_end("synthesis")
 
 
 
@@ -830,21 +892,33 @@ async def generate_and_stream_answer(
     total_start = time.perf_counter()
 
     sources_for_log = []
+    images_for_log = []
+    steps_for_log = []
+
+    def step_event(message: str) -> Dict[str, Any]:
+        steps_for_log.append(message)
+        return {"event": "steps", "data": {"message": message}}
 
     try:
         full_markdown_response = ""
+        provider_warnings_for_log = []
+
+        def warning_event(message: str) -> Dict[str, Any]:
+            provider_warnings_for_log.append(message)
+            return {"event": "provider_warning", "data": {"message": message}}
+
         yield {"event": "analysis_complete", "data": {"path": path}}
         
         if path == "direct_answer":
             print("[ORCHESTRATOR] Executing direct answer path.")
-            yield {"event": "steps", "data": {"message": "Generating answer..."}}
+            yield step_event("Generating answer...")
             
             conversation_history = _format_context_for_prompt(context_package)
             direct_prompt = f"Conversation History:\n{conversation_history}\n\nUser's Question: {prompt}"
             
             yield {"event": "synthesis_start", "data": {}}
             
-            direct_model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+            direct_model = genai.GenerativeModel(model_name=settings.GEMINI_MODEL)
             response_stream = await with_timeout(
                 direct_model.generate_content_async(direct_prompt, stream=True),
                 settings.PROVIDER_TIMEOUT_SECONDS,
@@ -863,7 +937,7 @@ async def generate_and_stream_answer(
 
         else:
             print("[ORCHESTRATOR] Executing search path.")
-            yield {"event": "steps", "data": {"message": "Searching the web..."}}
+            yield step_event("Searching the web...")
 
             image_task = asyncio.create_task(_get_images_from_tavily_async(prompt))
 
@@ -874,11 +948,11 @@ async def generate_and_stream_answer(
             use_search_results = not provider_error
 
             if provider_error:
-                yield {"event": "provider_warning", "data": {"message": provider_error}}
+                yield warning_event(provider_error)
                 path = "direct_answer"
                 conversation_history = _format_context_for_prompt(context_package)
                 fallback_prompt = f"Conversation History:\n{conversation_history}\n\nUser's Question: {prompt}"
-                direct_model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+                direct_model = genai.GenerativeModel(model_name=settings.GEMINI_MODEL)
                 response_stream = await with_timeout(
                     direct_model.generate_content_async(fallback_prompt, stream=True),
                     settings.PROVIDER_TIMEOUT_SECONDS,
@@ -896,11 +970,12 @@ async def generate_and_stream_answer(
                         yield {"event": "markdown_chunk", "data": {"chunk": chunk.text}}
                 images = await image_task
                 if images:
+                    images_for_log = images
                     yield {"event": "images", "data": {"images": images}}
 
             if use_search_results:
                 if tavily_instant_answer:
-                    yield {"event": "steps", "data": {"message": "Found quick results..."}}
+                    yield step_event("Found quick results...")
                     instant_header = f"> **Quick Summary:** {tavily_instant_answer}\n\n---\n\n"
                     full_markdown_response += instant_header
                     yield {"event": "markdown_chunk", "data": {"chunk": instant_header}}
@@ -908,6 +983,7 @@ async def generate_and_stream_answer(
                 images = await image_task
                 if images:
                     logger.info("Found %s image results.", len(images))
+                    images_for_log = images
                     yield {"event": "images", "data": {"images": images}}
 
                 scraped_data = [
@@ -934,16 +1010,31 @@ async def generate_and_stream_answer(
                 ]
                 yield {"event": "sources", "data": {"sources": sources_for_ui}}
 
-                yield {"event": "steps", "data": {"message": "Synthesizing full cited answer..."}}
+                yield step_event("Synthesizing full cited answer...")
                 yield {"event": "synthesis_start", "data": {}}
 
-                async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
-                    if chunk:
-                        full_markdown_response += chunk
-                        yield {"event": "markdown_chunk", "data": {"chunk": chunk}}
+                try:
+                    async for chunk in _synthesize_answer_from_context(prompt, scraped_data, context_package):
+                        if chunk:
+                            full_markdown_response += chunk
+                            yield {"event": "markdown_chunk", "data": {"chunk": chunk}}
+                except ProviderError as synthesis_error:
+                    logger.warning(
+                        "Using source-backed fallback after %s failed: %s",
+                        synthesis_error.provider,
+                        synthesis_error.public_message,
+                    )
+                    yield warning_event(synthesis_error.public_message)
+                    fallback_answer = "\n\n---\n\n" + _build_snippet_fallback_answer(
+                        prompt,
+                        scraped_data,
+                        None,
+                    )
+                    full_markdown_response += fallback_answer
+                    yield {"event": "markdown_chunk", "data": {"chunk": fallback_answer}}
 
         if full_markdown_response.strip():
-            yield {"event": "steps", "data": {"message": "Generating interactive UI..."}}
+            yield step_event("Generating interactive UI...")
             print("[ORCHESTRATOR] Running UI generation and metadata.")
 
             async def _run_thesys():
@@ -951,7 +1042,7 @@ async def generate_and_stream_answer(
                     return await generate_ui_spec_from_markdown(full_markdown_response, context_package)
                 except Exception as exc:
                     logger.warning("Interactive UI fallback used: %s", exc)
-                    return "<C1><P>Interactive UI generation is temporarily unavailable. The Markdown answer is still available.</P></C1>"
+                    return ""
 
             async def _run_metadata():
                 try:
@@ -989,7 +1080,10 @@ async def generate_and_stream_answer(
 
             print("[ORCHESTRATOR] UI generation and metadata complete.")
 
-            yield {"event": "aui_dsl", "data": raw_dsl_string}
+            if raw_dsl_string:
+                yield {"event": "aui_dsl", "data": raw_dsl_string}
+            else:
+                yield warning_event("Interactive UI generation is temporarily unavailable. The Markdown answer is still available.")
             await asyncio.sleep(0.1)
             yield {"event": "turn_metadata", "data": {"summary": summary, "entities": entities}}
 
@@ -1002,6 +1096,9 @@ async def generate_and_stream_answer(
                 "entities_mentioned": entities,
                 "full_response_spec": raw_dsl_string,
                 "sources_used": sources_for_log,
+                "images": images_for_log,
+                "steps": steps_for_log,
+                "provider_warnings": provider_warnings_for_log,
                 "execution_path": path,
                 "created_at": datetime.now(timezone.utc),
                 "full_markdown_response": full_markdown_response
@@ -1055,7 +1152,7 @@ async def _generate_summary(markdown_content: str) -> str:
     """Uses a fast LLM to generate a one-sentence summary of the response."""
     print("  > [METADATA] Generating response summary...")
     try:
-        model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+        model = genai.GenerativeModel(model_name=settings.GEMINI_METADATA_MODEL)
         prompt = f"""
         Analyze the following text, which is an AI-generated answer to a user's query.
         Your task is to create a very concise, one-sentence summary of the answer's main point.
@@ -1079,7 +1176,7 @@ async def _extract_entities(markdown_content: str) -> List[str]:
     print("  > [METADATA] Extracting key entities...")
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-3-flash-preview",
+            model_name=settings.GEMINI_METADATA_MODEL,
             generation_config={"response_mime_type": "application/json"}
         )
         prompt = f"""
@@ -1110,7 +1207,7 @@ async def _generate_chat_title(user_query: str) -> str:
     """
     print("  > [METADATA] Generating DEDICATED chat title for new session...")
     try:
-        model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+        model = genai.GenerativeModel(model_name=settings.GEMINI_METADATA_MODEL)
         
         prompt = f"""
         Analyze the user's initial query. Your task is to create a concise, 3-to-6-word, user-facing title for the conversation that is about to begin. The title should accurately represent the user's primary intent.

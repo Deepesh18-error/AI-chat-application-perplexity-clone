@@ -237,6 +237,48 @@ class ObjectIdEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
+def history_steps_for_doc(doc: dict) -> list[str]:
+    saved_steps = doc.get("steps")
+    if isinstance(saved_steps, list) and saved_steps:
+        return [str(step) for step in saved_steps if step]
+
+    execution_path = doc.get("execution_path")
+    if execution_path == "search_required":
+        steps = ["Searching the web..."]
+        if doc.get("sources_used"):
+            steps.append("Synthesizing full cited answer...")
+        if doc.get("full_response_spec"):
+            steps.append("Generating interactive UI...")
+        return steps
+
+    steps = ["Generating answer..."]
+    if doc.get("full_response_spec"):
+        steps.append("Generating interactive UI...")
+    return steps
+
+
+def safe_history_aui_spec(doc: dict) -> str:
+    full_spec = doc.get("full_response_spec")
+    if not isinstance(full_spec, str):
+        return ""
+
+    spec = full_spec.strip()
+    if not spec:
+        return ""
+
+    lower_spec = spec.lower()
+    broken_markers = (
+        "temporarily unavailable",
+        "taking too long",
+        "server api key not configured",
+        "unexpected server error",
+    )
+    if any(marker in lower_spec for marker in broken_markers):
+        return ""
+
+    return spec
+
+
 @csrf_exempt
 @require_http_methods(["GET"])
 @auth_required
@@ -247,19 +289,34 @@ async def get_session_list(request):
     logger.info("Received request for session list.")
 
     try:
-        await ensure_database_indexes()
-        pipeline = [
-            {"$match": {"user_id": request.mongo_user_id, "turn_number": 1}},
-            {"$sort": {"created_at": -1}},
-            {"$project": {"_id": 0, "session_id": 1, "title": "$chat_title"}},
-        ]
-        sessions = await conversations_collection.aggregate(pipeline).to_list(length=100)
+        try:
+            await ensure_database_indexes()
+        except Exception as index_error:
+            logger.warning("Continuing session list without refreshed indexes: %s", index_error)
+
+        cursor = conversations_collection.find(
+            {"user_id": request.mongo_user_id, "turn_number": 1},
+            {"_id": 0, "session_id": 1, "chat_title": 1, "created_at": 1},
+        ).sort("created_at", -1)
+        session_docs = await cursor.to_list(length=100)
+
+        sessions = []
+        seen_session_ids = set()
+        for session in session_docs:
+            session_id = session.get("session_id")
+            if not session_id or session_id in seen_session_ids:
+                continue
+            seen_session_ids.add(session_id)
+
+            title = session.get("chat_title")
+            sessions.append({
+                "session_id": session_id,
+                "title": title[:47] + "..." if isinstance(title, str) and len(title) > 50 else title,
+            })
 
         for session in sessions:
             title = session.get("title")
-            if isinstance(title, str) and title.strip():
-                session["title"] = title[:47] + "..." if len(title) > 50 else title
-            else:
+            if not isinstance(title, str) or not title.strip():
                 session["title"] = "Untitled Chat"
 
         return JsonResponse(sessions, safe=False)
@@ -285,23 +342,19 @@ async def get_session_history(request, session_id: str):
 
         formatted_history = []
         for doc in history_docs:
-            final_aui_spec = f"<C1><P>{doc.get('response_summary', 'No summary available.')}</P></C1>"
-            full_spec = doc.get("full_response_spec")
-            if isinstance(full_spec, str) and full_spec.strip():
-                final_aui_spec = full_spec
-
             formatted_history.append({
                 "key": str(doc["_id"]),
                 "prompt": doc.get("user_query"),
-                "steps": ["Loaded from history"],
+                "steps": history_steps_for_doc(doc),
                 "sources": doc.get("sources_used", []),
-                "auiSpec": final_aui_spec,
+                "auiSpec": safe_history_aui_spec(doc),
                 "streamingMarkdown": doc.get("full_markdown_response", ""),
                 "error": None,
                 "isLoading": False,
                 "summary": doc.get("response_summary"),
                 "entities": doc.get("entities_mentioned", []),
-                "images": [],
+                "images": doc.get("images", []),
+                "providerWarnings": doc.get("provider_warnings", []),
                 "isLoadedFromHistory": True,
             })
         return JsonResponse(formatted_history, safe=False, encoder=ObjectIdEncoder)

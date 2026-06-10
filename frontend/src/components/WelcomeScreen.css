@@ -3,7 +3,7 @@
 .welcome-container {
     position: absolute;
     inset: 0;
-    background-color: #141414;
+    background-color: var(--chat-background-color);
     overflow: hidden;
     z-index: 100;
     transition: all 0.3s ease-in-out;
@@ -433,7 +433,7 @@
 .welcome-container {
     position: absolute;
     inset: 0;
-    background: #141414;
+    background: var(--chat-background-color);
     overflow: hidden;
     z-index: 100;
 }

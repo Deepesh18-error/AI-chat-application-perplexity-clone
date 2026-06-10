@@ -11,10 +11,28 @@ import StreamingMarkdown from './StreamingMarkdown';
 
 const MotionDiv = motion.div;
 
+const hasRenderableC1Spec = (spec) => {
+  if (typeof spec !== 'string') return false;
+
+  const trimmedSpec = spec.trim();
+  if (!trimmedSpec) return false;
+
+  const loweredSpec = trimmedSpec.toLowerCase();
+  const fallbackMarkers = [
+    'temporarily unavailable',
+    'taking too long',
+    'server api key not configured',
+    'unexpected server error',
+  ];
+
+  return !fallbackMarkers.some((marker) => loweredSpec.includes(marker));
+};
+
 const ResponseContainer = ({ response }) => {
   const [activeTab, setActiveTab] = useState('Answer');
 
-  const hasContent = response.streamingMarkdown || response.auiSpec;
+  const canRenderInteractive = hasRenderableC1Spec(response.auiSpec);
+  const hasContent = response.streamingMarkdown || canRenderInteractive;
   const warnings = response.providerWarnings || [];
   const isStreaming = response.streamingMarkdown
     && response.progress?.currentStage === 'synthesizing'
@@ -72,7 +90,7 @@ const ResponseContainer = ({ response }) => {
                   <BsFileText /> Answer
                 </button>
 
-                {response.auiSpec && response.auiSpec.trim() && (
+                {canRenderInteractive && (
                   <button
                     className={`tab ${activeTab === 'Interactive' ? 'active' : ''}`}
                     onClick={() => setActiveTab('Interactive')}
@@ -118,7 +136,7 @@ const ResponseContainer = ({ response }) => {
                   />
                 )}
 
-                {activeTab === 'Interactive' && response.auiSpec && (
+                {activeTab === 'Interactive' && canRenderInteractive && (
                   <C1Component c1Response={response.auiSpec} />
                 )}
 

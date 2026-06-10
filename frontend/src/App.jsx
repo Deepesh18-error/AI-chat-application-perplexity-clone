@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { flushSync } from 'react-dom';
-import { ThemeProvider } from '@thesysai/genui-sdk';
-import { themePresets } from '@crayonai/react-ui';
 import { v4 as uuidv4 } from 'uuid';
 import { HiGlobe, HiMicrophone } from 'react-icons/hi';
 import { TfiLayoutSidebarLeft } from 'react-icons/tfi';
@@ -18,6 +16,7 @@ import {
   getMe,
   getStoredAuth,
   logout,
+  parseErrorMessage,
 } from './services/authClient';
 import './index.css';
 
@@ -168,7 +167,7 @@ function App() {
       setIsSessionsLoading(true);
       try {
         const response = await authFetch('sessions/');
-        if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
+        if (!response.ok) throw new Error(await parseErrorMessage(response));
         const data = await response.json();
         setSessions(data);
       } catch (error) {
@@ -564,12 +563,7 @@ function App() {
   }
 
   return (
-    <ThemeProvider
-      theme={themePresets.carbon}
-      darkTheme={themePresets.carbon}
-      mode="dark"
-    >
-      <div className={`app-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+    <div className={`app-layout ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         <Sidebar
           isOpen={isSidebarOpen}
           onNewChat={handleNewChat}
@@ -674,7 +668,6 @@ function App() {
           </div>
         </div>
       </div>
-    </ThemeProvider>
   );
 }
 

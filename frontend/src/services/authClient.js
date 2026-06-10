@@ -3,6 +3,7 @@ const AUTH_STORAGE_KEY = 'argon_auth';
 export const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/').replace(/\/?$/, '/');
 
 export const apiUrl = (path) => `${API_BASE_URL}${path.replace(/^\//, '')}`;
+const TOKEN_REFRESH_BUFFER_SECONDS = 30;
 
 export class AuthError extends Error {
   constructor(message = 'Authentication required') {
@@ -37,7 +38,30 @@ export const clearAuth = () => {
   localStorage.removeItem(AUTH_STORAGE_KEY);
 };
 
-const parseErrorMessage = async (response) => {
+const decodeJwtPayload = (token) => {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - normalizedPayload.length % 4) % 4),
+      '=',
+    );
+    return JSON.parse(window.atob(paddedPayload));
+  } catch {
+    return null;
+  }
+};
+
+const isAccessTokenFresh = (token) => {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+
+  const nowInSeconds = Math.floor(Date.now() / 1000);
+  return payload.exp - TOKEN_REFRESH_BUFFER_SECONDS > nowInSeconds;
+};
+
+export const parseErrorMessage = async (response) => {
   try {
     const data = await response.json();
     return data.error || data.message || `Request failed with status ${response.status}`;
@@ -91,8 +115,26 @@ export const refreshAuth = async () => {
   return saveAuth({ ...data, user: currentAuth.user });
 };
 
-export const authFetch = async (path, options = {}, retry = true) => {
+export const ensureValidAccessToken = async () => {
   const currentAuth = getStoredAuth();
+  if (!currentAuth?.accessToken) {
+    throw new AuthError();
+  }
+
+  if (isAccessTokenFresh(currentAuth.accessToken)) {
+    return currentAuth;
+  }
+
+  if (!currentAuth.refreshToken) {
+    clearAuth();
+    throw new AuthError();
+  }
+
+  return refreshAuth();
+};
+
+export const authFetch = async (path, options = {}, retry = true) => {
+  const currentAuth = await ensureValidAccessToken();
   if (!currentAuth?.accessToken) {
     throw new AuthError();
   }

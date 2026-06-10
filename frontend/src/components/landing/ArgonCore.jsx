@@ -43,7 +43,7 @@ function ArgonCore({
         </div>
 
         <div className="landing-interactive-area">
-          <p className="tagline">Hello, {displayName}</p>
+          <p className="tagline">welcome , {displayName}</p>
   
           <form 
             onSubmit={handleFormSubmit} 
