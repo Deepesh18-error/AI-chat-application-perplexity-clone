@@ -33,6 +33,10 @@ ALLOWED_HOSTS = env_list(
     ["localhost", "127.0.0.1"] if DEBUG else [],
 )
 
+render_external_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if render_external_hostname:
+    ALLOWED_HOSTS = sorted(set(ALLOWED_HOSTS + [render_external_hostname]))
+
 if not DEBUG:
     if SECRET_KEY.startswith("django-insecure-"):
         raise ValueError("DJANGO_SECRET_KEY must be set to a secure value when DJANGO_DEBUG=False.")
